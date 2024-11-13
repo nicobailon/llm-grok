@@ -1,0 +1,27 @@
+[project]
+name = "llm-grok"
+version = "0.1"
+description = "LLM plugin providing access to Grok models using the xAI API"
+readme = "README.md"
+authors = [{name = "Benedikt Hiepler"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
+dependencies = [
+    "llm>=0.17",
+    "httpx",
+    "httpx-sse",
+]
+
+[project.urls]
+Homepage = "https://github.com/hiepler/llm-grok"
+Changelog = "https://github.com/hiepler/llm-grok/releases"
+Issues = "https://github.com/hiepler/llm-grok/issues"
+CI = "https://github.com/hiepler/llm-grok/actions"
+
+[project.entry-points.llm]
+grok = "llm_grok"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-httpx"]
