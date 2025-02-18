@@ -101,11 +101,6 @@ List available Grok models:
 llm grok models
 ```
 
-Check your current configuration:
-```bash
-llm grok config
-```
-
 ## API Documentation
 
 This plugin uses the xAI API. For more information about the API, see:
