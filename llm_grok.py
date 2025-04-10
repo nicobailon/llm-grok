@@ -5,11 +5,16 @@ import llm
 from pydantic import Field
 from typing import Optional
 
-DEFAULT_MODEL = "grok-beta"
+AVAILABLE_MODELS = [
+    "grok-2-latest",
+    "grok-2-vision-latest"
+]
+DEFAULT_MODEL = "grok-2-latest"
 
 @llm.hookimpl
 def register_models(register):
-    register(Grok(DEFAULT_MODEL))
+    for model_id in AVAILABLE_MODELS:
+        register(Grok(model_id))
 
 class Grok(llm.Model):
     can_stream = True
@@ -31,7 +36,6 @@ class Grok(llm.Model):
             ge=0,
             default=None,
         )
-
     def __init__(self, model_id):
         self.model_id = model_id
 
@@ -149,4 +153,9 @@ def register_commands(cli):
     @grok.command()
     def models():
         "Show available Grok models"
-        click.echo(f"Available models: {DEFAULT_MODEL}")
+        click.echo("Available models:")
+        for model in AVAILABLE_MODELS:
+            if model == DEFAULT_MODEL:
+                click.echo(f"  {model} (default)")
+            else:
+                click.echo(f"  {model}")
