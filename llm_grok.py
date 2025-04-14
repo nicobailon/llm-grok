@@ -6,10 +6,14 @@ from pydantic import Field
 from typing import Optional
 
 AVAILABLE_MODELS = [
+    "grok-3-latest",
+    "grok-3-mini-fast-latest",
+    "grok-3-mini-latest",
+    "grok-3-fast-latest",
     "grok-2-latest",
     "grok-2-vision-latest"
 ]
-DEFAULT_MODEL = "grok-2-latest"
+DEFAULT_MODEL = "grok-3-latest"
 
 @llm.hookimpl
 def register_models(register):
