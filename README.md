@@ -32,21 +32,21 @@ export XAI_API_KEY="your-api-key-here"
 
 You can now access the Grok model. Run `llm models` to see it in the list.
 
-To run a prompt through `grok-beta`:
+To run a prompt through `grok-3-latest` (default model):
 
 ```bash
-llm -m grok-beta 'What is the meaning of life, the universe, and everything?'
+llm -m grok-3-latest 'What is the meaning of life, the universe, and everything?'
 ```
 
 To start an interactive chat session:
 
 ```bash
-llm chat -m grok-beta
+llm chat -m grok-3-latest
 ```
 
 Example chat session:
 ```
-Chatting with grok-beta
+Chatting with grok-3-latest
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
 > Tell me a joke about programming
@@ -55,12 +55,28 @@ Type '!multi' to enter multiple lines, then '!end' to finish
 To use a system prompt to give Grok specific instructions:
 
 ```bash
-cat example.py | llm -m grok-beta -s 'explain this code in a humorous way'
+cat example.py | llm -m grok-3-latest -s 'explain this code in a humorous way'
+```
+
+## Available Models
+
+The following Grok models are available:
+
+- `grok-3-latest` (default)
+- `grok-3-mini-fast-latest`
+- `grok-3-mini-latest`
+- `grok-3-fast-latest`
+- `grok-2-latest`
+- `grok-2-vision-latest`
+
+You can check the available models using:
+```bash
+llm grok models
 ```
 
 ## Model Options
 
-The grok-beta model accepts the following options, using `-o name value` syntax:
+The grok-3-latest model accepts the following options, using `-o name value` syntax:
 
 * `-o temperature 0.7`: The sampling temperature, between 0 and 1. Higher values like 0.8 increase randomness, while lower values like 0.2 make the output more focused and deterministic.
 * `-o max_tokens 100`: Maximum number of tokens to generate in the completion.
@@ -68,7 +84,7 @@ The grok-beta model accepts the following options, using `-o name value` syntax:
 Example with options:
 
 ```bash
-llm -m grok-beta -o temperature 0.2 -o max_tokens 50 'Write a haiku about AI'
+llm -m grok-3-latest -o temperature 0.2 -o max_tokens 50 'Write a haiku about AI'
 ```
 
 ## Development
