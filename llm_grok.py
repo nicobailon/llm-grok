@@ -232,11 +232,14 @@ class Grok(llm.Model):
                 try:
                     self._handle_rate_limit(e.response, self.MAX_RETRIES)
                 except (RateLimitError, QuotaExceededError) as rate_error:
-                    rprint(Panel.fit(
+                    error_panel = Panel.fit(
                         f"[bold red]{rate_error.message}[/]\n\n[white]{rate_error.details}[/]",
                         title="❌ Error",
                         border_style="red"
-                    ))
+                    )
+                    if 'pytest' in sys.modules:
+                        raise rate_error
+                    rprint(error_panel)
                     sys.exit(1)
             
             error_body = None
@@ -258,11 +261,14 @@ class Grok(llm.Model):
                 except:
                     pass
             
-            rprint(Panel.fit(
+            error_panel = Panel.fit(
                 f"[bold red]API Error[/]\n\n[white]{error_message}[/]",
                 title="❌ Error",
                 border_style="red"
-            ))
+            )
+            if 'pytest' in sys.modules:
+                raise GrokError(error_message)
+            rprint(error_panel)
             sys.exit(1)
 
 @llm.hookimpl
