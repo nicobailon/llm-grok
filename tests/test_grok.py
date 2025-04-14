@@ -81,7 +81,6 @@ def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
         "temperature": 0.0
     }
     
-    # Mock with exact content matching
     httpx_mock.add_response(
         method="POST",
         url="https://api.x.ai/v1/chat/completions",
@@ -95,7 +94,7 @@ def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
                 }
             }]
         },
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     conversation = llm.Conversation(model=model)
@@ -141,7 +140,7 @@ def test_non_streaming_request(model, mock_response, httpx_mock: HTTPXMock):
         match_headers={"Authorization": "Bearer xai-test-key-mock"},
         json=mock_response,
         headers={"Content-Type": "application/json"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     response = model.prompt("Test message", stream=False)
@@ -183,7 +182,7 @@ def test_streaming_request(model, httpx_mock: HTTPXMock):
         method="POST",
         url="https://api.x.ai/v1/chat/completions",
         match_headers={"Authorization": "Bearer xai-test-key-mock"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     response = model.prompt("Test message", stream=True)
@@ -207,7 +206,7 @@ def test_temperature_option(model, mock_response, httpx_mock: HTTPXMock):
         match_headers={"Authorization": "Bearer xai-test-key-mock"},
         json=mock_response,
         headers={"Content-Type": "application/json"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     # Create prompt and pass temperature directly
@@ -236,7 +235,7 @@ def test_max_tokens_option(model, mock_response, httpx_mock: HTTPXMock):
         match_headers={"Authorization": "Bearer xai-test-key-mock"},
         json=mock_response,
         headers={"Content-Type": "application/json"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     # Create prompt and pass max_tokens directly
@@ -273,7 +272,7 @@ def test_api_error(model, httpx_mock: HTTPXMock):
         status_code=400,
         json=error_response,
         headers={"Content-Type": "application/json"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     with pytest.raises(GrokError) as exc_info:
@@ -308,7 +307,7 @@ def test_stream_parsing_error(model, httpx_mock: HTTPXMock):
         method="POST",
         url="https://api.x.ai/v1/chat/completions",
         match_headers={"Authorization": "Bearer xai-test-key-mock"},
-        match_content=json.dumps(expected_request).encode()
+        match_json=expected_request
     )
     
     response = model.prompt("Test message", stream=True)
