@@ -120,7 +120,7 @@ llm grok models
 ## API Documentation
 
 This plugin uses the xAI API. For more information about the API, see:
-- [xAI API Documentation](https://docs.x.ai/api/integrations#openai-sdk)
+- [xAI API Documentation](https://docs.x.ai/docs/overview)
 
 ## Contributing
 
