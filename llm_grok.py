@@ -74,6 +74,7 @@ class Grok(llm.KeyModel):
             ge=0,
             default=None,
         )
+        # TODO: Add reasoning_effort
 
     def __init__(self, model_id):
         self.model_id = model_id
