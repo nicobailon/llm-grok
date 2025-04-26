@@ -115,7 +115,7 @@ def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
     prompt = llm.Prompt(model=model, prompt="New message")
     messages = model.build_messages(prompt, conversation)
 
-    assert len(messages) == 4
+    assert len(messages) == 3
     assert messages[1]["role"] == "user"
     assert messages[1]["content"] == "Previous message"
     assert messages[2]["role"] == "assistant"
