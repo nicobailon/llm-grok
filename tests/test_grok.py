@@ -116,12 +116,12 @@ def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
     messages = model.build_messages(prompt, conversation)
 
     assert len(messages) == 3
-    assert messages[1]["role"] == "user"
-    assert messages[1]["content"] == "Previous message"
-    assert messages[2]["role"] == "assistant"
-    assert messages[2]["content"] == "Previous response"
-    assert messages[3]["role"] == "user"
-    assert messages[3]["content"] == "New message"
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Previous message"
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == "Previous response"
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == "New message"
 
 
 def test_non_streaming_request(model, mock_response, httpx_mock: HTTPXMock):
