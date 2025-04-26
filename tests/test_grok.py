@@ -251,7 +251,7 @@ def test_max_tokens_option(model, mock_response, httpx_mock: HTTPXMock):
         ],
         "stream": False,
         "temperature": 0.0,
-        "max_tokens": 100,
+        "max_completion_tokens": 100,
     }
 
     httpx_mock.add_response(
@@ -264,7 +264,7 @@ def test_max_tokens_option(model, mock_response, httpx_mock: HTTPXMock):
     )
 
     # Create prompt and pass max_tokens directly
-    response = model.prompt("Test message", stream=False, max_tokens=100)
+    response = model.prompt("Test message", stream=False, max_completion_tokens=100)
     result = response.text()
     assert result == "Test response"
 
