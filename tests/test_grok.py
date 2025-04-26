@@ -83,10 +83,6 @@ def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Previous message"},
         ],
         "stream": False,
@@ -132,10 +128,6 @@ def test_non_streaming_request(model, mock_response, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": False,
@@ -164,10 +156,6 @@ def test_streaming_request(model, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": True,
@@ -206,10 +194,6 @@ def test_temperature_option(model, mock_response, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": False,
@@ -238,10 +222,6 @@ def test_max_tokens_option(model, mock_response, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": False,
@@ -271,10 +251,6 @@ def test_api_error(model, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": False,
@@ -311,10 +287,6 @@ def test_stream_parsing_error(model, httpx_mock: HTTPXMock):
     expected_request = {
         "model": DEFAULT_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy.",
-            },
             {"role": "user", "content": "Test message"},
         ],
         "stream": True,
