@@ -58,6 +58,13 @@ To use a system prompt to give Grok specific instructions:
 cat example.py | llm -m grok-3-latest -s 'explain this code in a humorous way'
 ```
 
+To set your default model:
+
+```bash
+llm models default grok-3-mini-latest
+# Now running `llm ...` will use `grok-3-mini-latest` by default
+```
+
 ## Available Models
 
 The following Grok models are available:
@@ -79,12 +86,12 @@ llm grok models
 The grok-3-latest model accepts the following options, using `-o name value` syntax:
 
 * `-o temperature 0.7`: The sampling temperature, between 0 and 1. Higher values like 0.8 increase randomness, while lower values like 0.2 make the output more focused and deterministic.
-* `-o max_tokens 100`: Maximum number of tokens to generate in the completion.
+* `-o max_completion_tokens 100`: Maximum number of tokens to generate in the completion (includes both visible tokens and reasoning tokens).
 
 Example with options:
 
 ```bash
-llm -m grok-3-latest -o temperature 0.2 -o max_tokens 50 'Write a haiku about AI'
+llm -m grok-3-latest -o temperature 0.2 -o max_completion_tokens 50 'Write a haiku about AI'
 ```
 
 ## Development
