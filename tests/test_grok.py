@@ -73,14 +73,9 @@ def test_build_messages_without_system_prompt(model):
     prompt = llm.Prompt(model=model, prompt="Test message")
     messages = model.build_messages(prompt, None)
 
-    assert len(messages) == 2
-    assert messages[0]["role"] == "system"
-    assert (
-        messages[0]["content"]
-        == "You are Grok, a chatbot inspired by the Hitchhikers Guide to the Galaxy."
-    )
-    assert messages[1]["role"] == "user"
-    assert messages[1]["content"] == "Test message"
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Test message"
 
 
 def test_build_messages_with_conversation(model, httpx_mock: HTTPXMock):
