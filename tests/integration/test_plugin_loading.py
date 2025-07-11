@@ -3,6 +3,7 @@ import pytest
 from typing import cast, Optional, List
 import llm
 from llm_grok import Grok, register_models, register_commands, GrokError
+from llm_grok.grok import GrokOptions
 from llm_grok.types import Message
 # Create a local MockPrompt class
 class MockPrompt(llm.Prompt):
@@ -74,7 +75,7 @@ def test_model_capabilities() -> None:
 def test_options_class() -> None:
     """Test that the Options class is properly defined."""
     model = Grok("x-ai/grok-4")
-    options = model.Options()
+    options = GrokOptions()
     
     # Check default values
     assert options.temperature == 0.0

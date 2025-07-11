@@ -1,0 +1,4 @@
+# Exclude examples from package distribution
+examples/ export-ignore
+docs/archive/ export-ignore
+*.md export-ignore

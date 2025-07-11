@@ -4,11 +4,11 @@ This module defines custom exceptions for handling various API errors and
 validation issues.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 __all__ = [
     "GrokError",
-    "RateLimitError", 
+    "RateLimitError",
     "QuotaExceededError",
     "ValidationError",
     "ConversionError",
@@ -20,7 +20,7 @@ __all__ = [
 
 class GrokError(Exception):
     """Base exception for all Grok API errors.
-    
+
     Attributes:
         message: Human-readable error message
         details: Additional error details from the API
@@ -28,9 +28,9 @@ class GrokError(Exception):
     """
 
     def __init__(
-        self, 
-        message: str, 
-        details: Optional[Dict[str, Any]] = None,
+        self,
+        message: str,
+        details: Optional[dict[str, Any]] = None,
         error_code: Optional[str] = None
     ) -> None:
         self.message = message
@@ -47,15 +47,15 @@ class GrokError(Exception):
 
 class RateLimitError(GrokError):
     """Exception raised when API rate limit is exceeded.
-    
+
     Attributes:
         retry_after: Seconds to wait before retrying (if provided by API)
     """
 
     def __init__(
-        self, 
+        self,
         message: str = "Rate limit exceeded",
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         retry_after: Optional[int] = None
     ) -> None:
         super().__init__(message, details, error_code="rate_limit_error")
@@ -64,23 +64,23 @@ class RateLimitError(GrokError):
 
 class QuotaExceededError(GrokError):
     """Exception raised when API quota is exceeded.
-    
+
     This typically indicates the account has reached its usage limits.
     """
 
     def __init__(
         self,
         message: str = "API quota exceeded",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="quota_exceeded_error")
 
 
 class ValidationError(GrokError):
     """Exception raised for validation failures.
-    
+
     This includes invalid parameters, malformed requests, or data format issues.
-    
+
     Attributes:
         field: The specific field that failed validation (if applicable)
     """
@@ -89,7 +89,7 @@ class ValidationError(GrokError):
         self,
         message: str,
         field: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="validation_error")
         self.field = field
@@ -97,9 +97,9 @@ class ValidationError(GrokError):
 
 class ConversionError(GrokError):
     """Exception raised during format conversion between APIs.
-    
+
     This occurs when converting between OpenAI and Anthropic formats fails.
-    
+
     Attributes:
         source_format: The format being converted from
         target_format: The format being converted to
@@ -110,7 +110,7 @@ class ConversionError(GrokError):
         message: str,
         source_format: Optional[str] = None,
         target_format: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="conversion_error")
         self.source_format = source_format
@@ -119,7 +119,7 @@ class ConversionError(GrokError):
 
 class APIError(GrokError):
     """General API error for non-specific failures.
-    
+
     Attributes:
         status_code: HTTP status code from the API
     """
@@ -128,7 +128,7 @@ class APIError(GrokError):
         self,
         message: str,
         status_code: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="api_error")
         self.status_code = status_code
@@ -136,23 +136,23 @@ class APIError(GrokError):
 
 class AuthenticationError(GrokError):
     """Exception raised for authentication failures.
-    
+
     This indicates issues with API key or authorization.
     """
 
     def __init__(
         self,
         message: str = "Authentication failed",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="authentication_error")
 
 
 class NetworkError(GrokError):
     """Exception raised for network-related failures.
-    
+
     This includes timeouts, connection errors, and DNS failures.
-    
+
     Attributes:
         original_error: The underlying network exception if available
     """
@@ -161,7 +161,7 @@ class NetworkError(GrokError):
         self,
         message: str = "Network error occurred",
         original_error: Optional[Exception] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="network_error")
         self.original_error = original_error

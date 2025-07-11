@@ -1,35 +1,58 @@
 [project]
-name = "llm-grok"
-version = "1.0"
-description = "LLM plugin providing access to Grok models using the xAI API"
+name = "llm-grok-enhanced"
+version = "1.0.0"
+description = "Enhanced LLM plugin for xAI Grok models with enterprise features and advanced capabilities"
 readme = "README.md"
-authors = [{name = "Benedikt Hiepler"}]
-license = {text = "Apache-2.0"}
+authors = [
+    {name = "Nico Bailon", email = "nico@bailon.org"},
+    {name = "Benedikt Hiepler"}
+]
+license = "Apache-2.0"
+keywords = ["llm", "grok", "xai", "plugin", "ai", "enhanced", "enterprise"]
 classifiers = [
-    "License :: OSI Approved :: Apache Software License"
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
 dependencies = [
     "llm>=0.17",
     "httpx",
-    "httpx-sse",
+    "pydantic>=2.0",
+    "typing_extensions",
     "rich>=10.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/hiepler/llm-grok"
-Changelog = "https://github.com/hiepler/llm-grok/releases"
-Issues = "https://github.com/hiepler/llm-grok/issues"
-CI = "https://github.com/hiepler/llm-grok/actions"
+Homepage = "https://github.com/nicobailon/llm-grok"
+Documentation = "https://github.com/nicobailon/llm-grok#readme"
+Repository = "https://github.com/nicobailon/llm-grok"
+Changelog = "https://github.com/nicobailon/llm-grok/releases"
+Issues = "https://github.com/nicobailon/llm-grok/issues"
+CI = "https://github.com/nicobailon/llm-grok/actions"
+"Original Project" = "https://github.com/Hiepler/llm-grok"
 
 [project.entry-points.llm]
-grok = "llm_grok"
+grok-enhanced = "llm_grok"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-httpx"]
+test = ["pytest", "pytest-httpx", "pytest-cov"]
 dev = ["mypy", "black", "ruff", "types-click"]
+# Combined dependencies for CI/CD workflows
+all = ["pytest", "pytest-httpx", "pytest-cov", "mypy", "black", "ruff", "types-click"]
+
+[tool.setuptools.packages.find]
+include = ["llm_grok", "llm_grok.*"]
+exclude = ["examples", "examples.*", "tests", "tests.*", "docs"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -41,9 +64,10 @@ pretty = true
 
 [[tool.mypy.overrides]]
 module = [
-    "llm",
-    "llm.*",
+    "httpx.*",
     "httpx_sse",
+    "llm.*",
+    "pydantic.*",
     "rich.*"
 ]
 ignore_missing_imports = true
@@ -55,6 +79,8 @@ target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings

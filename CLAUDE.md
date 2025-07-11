@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is `llm-grok`, a Python plugin for the [LLM](https://llm.datasette.io/) CLI tool that provides access to Grok models using the xAI API. The plugin is published to PyPI and enables users to interact with various Grok models through the command line.
+This is `llm-grok-enhanced`, a Python plugin for the [LLM](https://llm.datasette.io/) CLI tool that provides access to Grok models using the xAI API. The plugin is published to PyPI and enables users to interact with various Grok models through the command line.
 
 **Current Version**: 2.1.0 (with /messages endpoint support)
 
@@ -46,6 +46,13 @@ pytest tests/test_grok.py
 pytest tests/test_grok.py::test_model_initialization
 ```
 
+### Type Checking
+
+```bash
+# Run type checker
+mypy llm_grok --strict
+```
+
 ### Building and Publishing
 
 ```bash
@@ -58,32 +65,40 @@ python -m twine upload dist/*
 
 ## Architecture
 
-The plugin provides two implementation approaches:
+The llm-grok-enhanced plugin uses a modular architecture optimized for maintainability and enterprise use:
 
-### 1. Consolidated Implementation (Recommended)
-**File**: `llm_grok/llm_grok.py` (~450 lines)
+### **Core Structure**
+```
+llm_grok/
+├── grok.py              # Main model class and orchestration
+├── client.py            # Enterprise HTTP client  
+├── models.py            # Model registry and capabilities
+├── types.py             # Comprehensive type definitions
+├── exceptions.py        # Error handling hierarchy
+├── formats/             # API format converters
+│   ├── openai.py       # OpenAI format handling
+│   └── anthropic.py    # Anthropic format handling
+└── processors/          # Content processors
+    ├── multimodal.py   # Image processing
+    ├── streaming.py    # SSE stream handling
+    └── tools.py        # Function calling
+```
 
-A clean, single-file implementation containing:
-- Model registry with all Grok models
-- Simple HTTP client with retry logic
-- Main Grok class with all features
-- Plugin registration
-- CLI commands
+### **Development Guidelines**
 
-This implementation is ideal for most users and includes all core functionality while being easy to understand and modify.
+**Always use the modular implementation** for all development work:
+- Modify components in their specialized files
+- Add new processors for new content types  
+- Extend formatters for new API formats
+- Use the type system for safety
 
-### 2. Modular Implementation
-**Directory**: `llm_grok/` with multiple modules
 
-An enterprise-grade architecture with:
-- `client.py`: HTTP client with circuit breakers and connection pooling
-- `exceptions.py`: Comprehensive exception hierarchy
-- `types.py`: Full TypedDict definitions
-- `formats/`: API format converters
-- `processors/`: Specialized content handlers
-- `models.py`: Model registry and utilities
+### **Key Patterns**
 
-This implementation provides advanced features like SSRF protection, thread-safe resource management, and extensive error handling.
+1. **Processor Pattern**: Specialized classes handle specific content types
+2. **Formatter Pattern**: Convert between different API formats
+3. **Type Safety**: Extensive TypedDict usage throughout
+4. **Enterprise Reliability**: Circuit breakers, retries, connection pooling
 
 ### Model Configuration
 
@@ -301,10 +316,9 @@ if "tool_calls" in delta:
 ## Implementation Choice
 
 When working on this codebase:
-- **Use the consolidated implementation** (`llm_grok.py`) for most development work
-- The modular implementation exists for backwards compatibility and enterprise needs
-- Both implementations provide identical functionality to end users
-- The consolidated version is easier to understand, debug, and modify
+- **Use the modular implementation** (`llm_grok/` package) for all development work
+- Focus on the production modular architecture for all development work
+- Use the comprehensive documentation in ARCHITECTURE.md to understand core concepts
 
 
 
@@ -320,6 +334,14 @@ user: Any = get_user()  # NO
 result = operation()  # type: ignore  # NO
 Status = str  # NO - use Literal/Enum
 ```
+
+**CRITICAL: Avoid `# type: ignore` comments**
+- If mypy flags `# type: ignore` as unused, the underlying type issue may have been resolved
+- Always remove unused `# type: ignore` comments immediately
+- Use proper type-safe alternatives instead:
+  - `setattr(obj, 'attr', value)` for dynamic attribute assignment
+  - Type guards and runtime checks for unknown types
+  - Proper type annotations and protocols
 
 **REQUIRED Practices:**
 ```python

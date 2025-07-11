@@ -1,17 +1,28 @@
-# llm-grok
+# llm-grok-enhanced
 
-[![PyPI](https://img.shields.io/pypi/v/llm-grok.svg)](https://pypi.org/project/llm-grok/)
-[![Tests](https://github.com/hiepler/llm-grok/workflows/Test/badge.svg)](https://github.com/hiepler/llm-grok/actions?query=workflow%3ATest)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/hiepler/llm-grok/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/llm-grok-enhanced.svg)](https://pypi.org/project/llm-grok-enhanced/)
+[![Tests](https://github.com/nicobailon/llm-grok/workflows/Test/badge.svg)](https://github.com/nicobailon/llm-grok/actions?query=workflow%3ATest)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/nicobailon/llm-grok/blob/main/LICENSE)
 
-Plugin for [LLM](https://llm.datasette.io/) providing access to Grok models using the xAI API
+Enhanced plugin for [LLM](https://llm.datasette.io/) providing advanced access to Grok models using the xAI API.
+
+## 🚀 Enhanced Features
+
+This enhanced version builds upon the original llm-grok with significant improvements:
+
+- **🏗️ Modular Architecture**: Enterprise-grade component-based design
+- **🔒 Enhanced Security**: SSRF protection and advanced error handling
+- **⚡ Performance**: Connection pooling and circuit breakers
+- **🎯 Type Safety**: Comprehensive TypedDict coverage
+- **🔧 Reliability**: Improved retry logic and error recovery
+- **📊 Advanced Monitoring**: Rich terminal UI with progress indicators
 
 ## Installation
 
-Install this plugin in the same environment as LLM:
+Install this enhanced plugin in the same environment as LLM:
 
 ```bash
-llm install llm-grok
+llm install llm-grok-enhanced
 ```
 
 ## Usage
@@ -171,28 +182,30 @@ The messages endpoint provides better handling of:
 
 ## Architecture
 
-The plugin provides two implementation approaches:
+The llm-grok-enhanced plugin uses a clean, modular architecture optimized for reliability and maintainability:
 
-### Consolidated Implementation (Recommended for most users)
-- **Single file**: `llm_grok.py` contains the entire implementation (~450 lines)
-- **Simple and maintainable**: All functionality in one place
-- **Full feature support**: Images, streaming, function calling, all models
-- **Minimal dependencies**: Only requires httpx, llm, and pydantic
+### 🏗️ **Component-Based Design**
+- **Processors**: Handle content transformation (multimodal, streaming, tools)
+- **Formatters**: Convert between API formats (OpenAI ↔ Anthropic)  
+- **Client**: Enterprise HTTP client with retry logic and connection pooling
+- **Models**: Centralized model capability registry
 
-### Modular Implementation (For advanced use cases)
-- **Multiple modules**: Separated into client, processors, format handlers, etc.
-- **Enterprise features**: Circuit breakers, connection pooling, SSRF protection
-- **Extensible**: Easy to add new processors or format handlers
-- **Complex type system**: Comprehensive TypedDict definitions
+### 🎓 **Learning Resources**
+For understanding the core concepts, refer to the modular architecture documentation in `ARCHITECTURE.md`.
 
-For details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+### 🔧 **Enterprise Features**
+- Thread-safe shared resource management
+- Circuit breakers and connection pooling
+- Comprehensive error handling hierarchy
+- SSRF protection and security measures
+- Type-safe API with full TypedDict coverage
 
 ## Development
 
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:
 
 ```bash
-git clone https://github.com/hiepler/llm-grok.git
+git clone https://github.com/nicobailon/llm-grok.git
 cd llm-grok
 python3 -m venv venv
 source venv/bin/activate
@@ -317,6 +330,10 @@ For vision-capable models (Grok 4, Grok 2 Vision):
 - Handles URLs, local files, and base64-encoded data
 - Automatic MIME type detection
 - Images are converted to base64 data URLs when needed
+
+## Attribution
+
+This project is an enhanced version of the original [llm-grok](https://github.com/Hiepler/llm-grok) by Benedikt Hiepler. See [ATTRIBUTION.md](ATTRIBUTION.md) for full attribution details.
 
 ## Contributing
 
