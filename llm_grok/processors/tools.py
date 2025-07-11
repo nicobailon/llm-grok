@@ -1,18 +1,24 @@
 """Tool calling and function execution processing."""
 import json
 import logging
-from typing import Optional, Union, Protocol, runtime_checkable, Dict, cast, Any
+from typing import Any, Optional, Protocol, Union, cast, runtime_checkable
+
 from typing_extensions import TypeGuard
 
+from ..types import (
+    AnthropicResponse,
+    OpenAIResponse,
+    RawToolCall,
+    ToolCall,
+    ToolCallWithIndex,
+)
 from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
-
-from ..types import AnthropicResponse, OpenAIResponse, RawFunctionCall, RawToolCall, ToolCall, ToolCallWithIndex
 
 
 @runtime_checkable
 class LLMResponseProtocol(Protocol):
     """Protocol for LLM framework response objects."""
-    
+
     def tool_calls(self) -> list[ToolCall]: ...
     def add_tool_call(self, tool_call: Any) -> None: ...
 
@@ -25,7 +31,7 @@ class MockResponseProtocol(Protocol):
 
 def has_add_tool_call(obj: object) -> TypeGuard[LLMResponseProtocol]:
     """Type guard for objects with add_tool_call method."""
-    return hasattr(obj, 'add_tool_call') and callable(getattr(obj, 'add_tool_call'))
+    return hasattr(obj, 'add_tool_call') and callable(getattr(obj, 'add_tool_call', None))
 
 
 def has_tool_calls_attr(obj: object) -> TypeGuard[MockResponseProtocol]:
@@ -37,11 +43,11 @@ logger = logging.getLogger(__name__)
 
 class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], list[ToolCall]]):
     """Handles tool calling and function execution.
-    
+
     Processes function/tool calls from API responses, supporting both OpenAI and Anthropic
     formats. Handles validation, format conversion, streaming accumulation, and parallel
     tool call execution.
-    
+
     Key features:
     - Unified handling of OpenAI and Anthropic tool call formats
     - Streaming tool call accumulation for real-time processing
@@ -59,32 +65,32 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
         """Get processor configuration."""
         return self._config
 
-    def _is_openai_response(self, response: Union[OpenAIResponse, AnthropicResponse, Dict[str, object]]) -> TypeGuard[OpenAIResponse]:
+    def _is_openai_response(self, response: Union[OpenAIResponse, AnthropicResponse, dict[str, object]]) -> TypeGuard[OpenAIResponse]:
         """Type guard for OpenAI response format."""
         return isinstance(response, dict) and "choices" in response and isinstance(response.get("choices"), list)
 
-    def _is_anthropic_response(self, response: Union[OpenAIResponse, AnthropicResponse, Dict[str, object]]) -> TypeGuard[AnthropicResponse]:
+    def _is_anthropic_response(self, response: Union[OpenAIResponse, AnthropicResponse, dict[str, object]]) -> TypeGuard[AnthropicResponse]:
         """Type guard for Anthropic response format."""
         return isinstance(response, dict) and "content" in response and isinstance(response.get("content"), list)
 
-    def process(self, content: Union[OpenAIResponse, AnthropicResponse, Dict[str, object]]) -> list[ToolCall]:
+    def process(self, content: Union[OpenAIResponse, AnthropicResponse, dict[str, object]]) -> list[ToolCall]:
         """Process tool calls from API response.
-        
+
         Extracts and validates tool calls from both OpenAI and Anthropic response formats,
         handling both single and parallel tool calls.
-        
+
         Args:
             content: API response containing tool calls
-            
+
         Returns:
             List of validated and formatted ToolCall objects
-            
+
         Raises:
             ValidationError: If tool calls are malformed or invalid
         """
         if not isinstance(content, dict):
             return []
-        
+
         # Use type guards to narrow the type
         if self._is_openai_response(content):
             return self._extract_openai_tool_calls(content)
@@ -95,24 +101,24 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
     def _extract_openai_tool_calls(self, response: OpenAIResponse) -> list[ToolCall]:
         """Extract tool calls from OpenAI response."""
         tool_calls: list[ToolCall] = []
-        
+
         if response["choices"]:
             choice = response["choices"][0]
             message = choice["message"]
-            
+
             if "tool_calls" in message and message["tool_calls"]:
                 for raw_call in message["tool_calls"]:
                     # Use proper typing for tool call validation
                     validated_call = self._validate_and_format_tool_call(cast(RawToolCall, raw_call))
                     if validated_call:
                         tool_calls.append(validated_call)
-        
+
         return tool_calls
 
     def _extract_anthropic_tool_calls(self, response: AnthropicResponse) -> list[ToolCall]:
         """Extract tool calls from Anthropic response."""
         tool_calls: list[ToolCall] = []
-        
+
         for content_block in response["content"]:
             if content_block.get("type") == "tool_use":
                 # Convert Anthropic format to OpenAI format
@@ -130,13 +136,13 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
     def validate(self, tool_calls: list[ToolCall]) -> bool:
         """Validate a list of tool calls.
-        
+
         Args:
             tool_calls: List of tool calls to validate
-            
+
         Returns:
             True if all tool calls are valid
-            
+
         Raises:
             ValidationError: If any tool call is invalid
         """
@@ -168,10 +174,10 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
             if isinstance(func["arguments"], str):
                 try:
                     json.loads(func["arguments"])
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
                     raise ValidationError(
                         f"Tool call {i} has invalid JSON in arguments: {func['arguments']}"
-                    )
+                    ) from e
             else:
                 raise ValidationError(f"Tool call {i} arguments must be a JSON string")
 
@@ -179,17 +185,17 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
     def _validate_and_format_tool_call(self, raw_call: RawToolCall) -> Optional[ToolCallWithIndex]:
         """Validate and format a single tool call.
-        
+
         Args:
             raw_call: Raw tool call data from API
-            
+
         Returns:
             Formatted ToolCall or None if invalid
         """
         try:
             # Extract required fields
             call_id = raw_call.get("id")
-            call_type = raw_call.get("type", "function")
+            raw_call.get("type", "function")
             function_data = raw_call.get("function")
 
             if not call_id or not function_data:
@@ -233,7 +239,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
     def process_tool_calls(self, response: object, tool_calls: list[ToolCall]) -> None:
         """Process and add tool calls to the response object.
-        
+
         Args:
             response: The LLM response object (real llm.Response or mock for testing)
             tool_calls: List of properly typed tool calls from the API
@@ -264,7 +270,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
     def accumulate_tool_call(self, accumulator: list[RawToolCall], delta: RawToolCall) -> None:
         """Accumulate streaming tool call chunks.
-        
+
         Args:
             accumulator: List to accumulate tool calls into
             delta: The incremental tool call data from the stream
@@ -302,10 +308,10 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
     def finalize_tool_calls(self, accumulated: list[RawToolCall]) -> list[ToolCallWithIndex]:
         """Convert accumulated tool calls to final format.
-        
+
         Args:
             accumulated: List of accumulated tool call data
-            
+
         Returns:
             List of properly formatted ToolCallWithIndex objects
         """
@@ -346,12 +352,12 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse], l
 
         return finalized
 
-    def validate_tool_definition(self, tool: Dict[str, object]) -> bool:
+    def validate_tool_definition(self, tool: dict[str, object]) -> bool:
         """Validate tool conforms to expected schema.
-        
+
         Args:
             tool: Tool definition to validate
-            
+
         Returns:
             True if valid, False otherwise
         """

@@ -14,7 +14,7 @@ CLIObject = Any  # External library, can't be more specific
 @llm.hookimpl
 def register_models(register: RegisterFunction) -> None:
     """Register all available Grok models with LLM CLI.
-    
+
     Args:
         register: The LLM model registration function
     """
@@ -25,10 +25,10 @@ def register_models(register: RegisterFunction) -> None:
 @llm.hookimpl
 def register_commands(cli: CLIObject) -> None:
     """Register additional CLI commands.
-    
+
     Currently this plugin doesn't add any custom commands,
     but this hook is required for LLM plugin compatibility.
-    
+
     Args:
         cli: The LLM CLI object
     """

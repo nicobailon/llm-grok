@@ -7,14 +7,13 @@ import random
 import threading
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any, Literal, Optional, Union, cast
-from typing_extensions import TypeGuard
-from contextlib import AbstractContextManager
 
 import httpx
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from typing_extensions import TypeGuard
 
 from .constants import (
     DEFAULT_KEEPALIVE_RATIO,
@@ -52,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 class GrokClient:
     """HTTP client for interacting with Grok API endpoints.
-    
+
     Handles:
     - HTTP request execution with retry logic
     - Rate limit handling with exponential backoff
@@ -85,7 +84,7 @@ class GrokClient:
         enable_logging: bool = False,
     ):
         """Initialize the Grok HTTP client.
-        
+
         Args:
             api_key: xAI API key for authentication
             timeout: Request timeout in seconds (None for no timeout)
@@ -162,7 +161,7 @@ class GrokClient:
     def _is_openai_response(self, response: dict[str, Any]) -> TypeGuard[OpenAIResponse]:
         """Type guard to check if response is OpenAI format."""
         return (
-            "choices" in response 
+            "choices" in response
             and isinstance(response.get("choices"), list)
             and "object" in response
         )
@@ -170,7 +169,7 @@ class GrokClient:
     def _is_anthropic_response(self, response: dict[str, Any]) -> TypeGuard[AnthropicResponse]:
         """Type guard to check if response is Anthropic format."""
         return (
-            "content" in response 
+            "content" in response
             and isinstance(response.get("content"), list)
             and response.get("type") == "message"
         )
@@ -198,10 +197,10 @@ class GrokClient:
 
     def _compute_cache_key(self, json_data: RequestBody) -> str:
         """Compute a cache key for JSON data.
-        
+
         Args:
             json_data: JSON payload
-            
+
         Returns:
             Cache key based on content hash
         """
@@ -212,10 +211,10 @@ class GrokClient:
 
     def _estimate_json_size(self, json_data: RequestBody) -> int:
         """Estimate JSON size with caching.
-        
+
         Args:
             json_data: JSON payload
-            
+
         Returns:
             Estimated size in bytes
         """
@@ -235,13 +234,13 @@ class GrokClient:
             key_memory = len(cache_key.encode('utf-8'))
             value_memory = 8  # int size in Python (approximate)
             entry_memory = key_memory + value_memory
-            
+
             # If adding this entry would exceed memory limit or size limit, clear cache
-            if (self._cache_memory_usage + entry_memory > self.MAX_CACHE_MEMORY or 
+            if (self._cache_memory_usage + entry_memory > self.MAX_CACHE_MEMORY or
                 len(self._json_size_cache) >= self.MAX_CACHE_SIZE):
                 self._json_size_cache.clear()
                 self._cache_memory_usage = 0
-            
+
             # Add entry and update memory tracking
             if cache_key not in self._json_size_cache:
                 self._cache_memory_usage += entry_memory
@@ -251,10 +250,10 @@ class GrokClient:
 
     def _validate_request_size(self, json_data: RequestBody) -> None:
         """Validate that request data doesn't exceed size limits.
-        
+
         Args:
             json_data: JSON payload to validate
-            
+
         Raises:
             ValueError: If request size exceeds limits
         """
@@ -269,11 +268,11 @@ class GrokClient:
 
     def _calculate_backoff_delay(self, attempt: int, retry_after: Optional[int] = None) -> float:
         """Calculate backoff delay with exponential backoff and jitter.
-        
+
         Args:
             attempt: Current retry attempt number (0-based)
             retry_after: Optional server-provided retry delay in seconds
-            
+
         Returns:
             Delay in seconds with jitter applied
         """
@@ -300,7 +299,7 @@ class GrokClient:
 
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state and raise error if circuit is open.
-        
+
         Raises:
             NetworkError: If circuit is open and not ready for recovery
         """
@@ -355,13 +354,13 @@ class GrokClient:
         self, stream_cm: AbstractContextManager[httpx.Response]
     ) -> Iterator[httpx.Response]:
         """Wrap streaming context manager to track circuit breaker success/failure.
-        
+
         Args:
             stream_cm: The original streaming context manager
-            
+
         Yields:
             The streaming response
-            
+
         Raises:
             Any exception from the stream, after recording failure
         """
@@ -388,10 +387,10 @@ class GrokClient:
 
     def _parse_error_response(self, response: httpx.Response) -> tuple[str, Optional[str]]:
         """Parse error details from API response.
-        
+
         Args:
             response: HTTP response object
-            
+
         Returns:
             Tuple of (error_message, error_code)
         """
@@ -425,14 +424,14 @@ class GrokClient:
 
     def _handle_rate_limit(self, response: httpx.Response, attempt: int) -> bool:
         """Handle rate limit response with retry logic.
-        
+
         Args:
             response: HTTP response with 429 status
             attempt: Current retry attempt number
-            
+
         Returns:
             True if should retry, False otherwise
-            
+
         Raises:
             RateLimitError: If max retries exceeded
             QuotaExceededError: If quota is exhausted
@@ -491,10 +490,10 @@ class GrokClient:
 
     def _handle_error_response(self, response: httpx.Response) -> None:
         """Handle non-rate-limit error responses.
-        
+
         Args:
             response: HTTP error response
-            
+
         Raises:
             AuthenticationError: For 401 errors
             APIError: For other API errors
@@ -524,17 +523,17 @@ class GrokClient:
         stream: bool = False,
     ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Execute HTTP request with retry logic for rate limiting.
-        
+
         Args:
             method: HTTP method (e.g., 'POST')
             url: Request URL
             headers: Request headers dict
             json_data: JSON payload for request body
             stream: Whether to stream the response
-            
+
         Returns:
             httpx.Response or stream context manager
-            
+
         Raises:
             RateLimitError: When rate limit is exceeded after all retries
             QuotaExceededError: When API quota is exceeded
@@ -586,7 +585,7 @@ class GrokClient:
                 raise NetworkError(
                     "Request timed out",
                     original_error=e
-                )
+                ) from e
 
             except httpx.NetworkError as e:
                 self._record_failure()
@@ -594,7 +593,7 @@ class GrokClient:
                 raise NetworkError(
                     f"Network error: {str(e)}",
                     original_error=e
-                )
+                ) from e
 
             except Exception as e:
                 self._record_failure()
@@ -602,7 +601,7 @@ class GrokClient:
                 raise GrokError(
                     f"Unexpected error: {str(e)}",
                     details={"exception_type": type(e).__name__}
-                )
+                ) from e
 
         # Should not reach here due to exceptions in loop
         raise GrokError("Request failed after all retries")
@@ -615,18 +614,18 @@ class GrokClient:
         json_data: RequestBody,
     ) -> AbstractContextManager[httpx.Response]:
         """Execute streaming HTTP request with retry logic.
-        
+
         This is a convenience method that wraps make_request with stream=True.
-        
+
         Args:
             method: HTTP method (e.g., 'POST')
             url: Request URL
             headers: Request headers dict
             json_data: JSON payload for request body
-            
+
         Returns:
             Stream context manager for reading response
-            
+
         Raises:
             Same as make_request
         """
@@ -649,7 +648,7 @@ class GrokClient:
         stream_options: Optional[StreamOptions] = None,
     ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Make a request to the OpenAI-compatible chat completions endpoint.
-        
+
         Args:
             messages: List of conversation messages
             model: Model ID to use
@@ -661,7 +660,7 @@ class GrokClient:
             response_format: Output format specification
             reasoning_effort: Reasoning depth control
             stream_options: Streaming configuration
-            
+
         Returns:
             Response object or stream context manager
         """
@@ -709,17 +708,17 @@ class GrokClient:
         reasoning_effort: Optional[str] = None,
     ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Make a request to the Anthropic-compatible messages endpoint.
-        
+
         Args:
             request_data: Anthropic format request with messages and optional system
-            model: Model ID to use  
+            model: Model ID to use
             stream: Whether to stream the response
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens to generate
             tools: Function/tool definitions in Anthropic format
             tool_choice: Tool selection in Anthropic format
             reasoning_effort: Reasoning depth control
-            
+
         Returns:
             Response object or stream context manager
         """

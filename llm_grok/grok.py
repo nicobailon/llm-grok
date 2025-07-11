@@ -2,46 +2,47 @@
 import sys
 import threading
 from collections.abc import Iterator
-from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, Dict, Any, ClassVar, Type
-from typing_extensions import TypeGuard
 from contextlib import AbstractContextManager
+from typing import (
+    Any,
+    Literal,
+    Optional,
+    Protocol,
+    Union,
+    cast,
+    runtime_checkable,
+)
 
 import httpx
 import llm
-from pydantic import Field, BaseModel
-from rich import print as rprint
-from rich.console import Console
-from rich.panel import Panel
 
 # Import LLM framework components
 from llm import KeyModel as LLMKeyModel
 from llm.models import Options as LLMOptionsBase
+from pydantic import Field
+from rich import print as rprint
+from rich.console import Console
+from rich.panel import Panel
+from typing_extensions import TypeGuard
 
 from .client import GrokClient
 from .exceptions import (
-    APIError,
     AuthenticationError,
-    GrokError,
     NetworkError,
     QuotaExceededError,
     RateLimitError,
 )
 from .formats import AnthropicFormatHandler, OpenAIFormatHandler
-from .models import MODEL_INFO, get_model_info_safe
+from .models import get_model_info_safe
 from .processors import ImageProcessor, StreamProcessor, ToolProcessor
 from .types import (
     AnthropicRequest,
     AnthropicToolChoice,
     AnthropicToolDefinition,
     ImageContent,
-    LLMModelProtocol,
-    LLMOptionsProtocol,
-    LLMPromptProtocol,
     Message,
-    RequestBody,
     ResponseFormat,
     TextContent,
-    ToolCall,
     ToolChoice,
     ToolDefinition,
 )
@@ -53,7 +54,7 @@ class ResponseProtocol(Protocol):
     def text(self) -> str: ...
 
 
-@runtime_checkable  
+@runtime_checkable
 class ResponseWithContent(Protocol):
     """Protocol for response objects with content attribute."""
     content: str
@@ -71,14 +72,56 @@ class HTTPErrorWithResponse(Protocol):
     response: HTTPResponse
 
 
+@runtime_checkable
+class HasTemperature(Protocol):
+    """Protocol for objects with temperature attribute."""
+    temperature: Optional[Union[int, float]]
+
+
+@runtime_checkable
+class HasMaxCompletionTokens(Protocol):
+    """Protocol for objects with max_completion_tokens attribute."""
+    max_completion_tokens: Optional[int]
+
+
+@runtime_checkable
+class HasTools(Protocol):
+    """Protocol for objects with tools attribute."""
+    tools: Optional[list[Any]]
+
+
+@runtime_checkable
+class HasToolChoice(Protocol):
+    """Protocol for objects with tool_choice attribute."""
+    tool_choice: Any
+
+
+@runtime_checkable
+class HasResponseFormat(Protocol):
+    """Protocol for objects with response_format attribute."""
+    response_format: Any
+
+
+@runtime_checkable
+class HasReasoningEffort(Protocol):
+    """Protocol for objects with reasoning_effort attribute."""
+    reasoning_effort: Optional[str]
+
+
+@runtime_checkable
+class HasUseMessagesEndpoint(Protocol):
+    """Protocol for objects with use_messages_endpoint attribute."""
+    use_messages_endpoint: Optional[bool]
+
+
 def is_response_like(obj: object) -> TypeGuard[ResponseProtocol]:
     """Type guard for response-like objects."""
-    return hasattr(obj, 'text') and callable(getattr(obj, 'text'))
+    return hasattr(obj, 'text') and callable(getattr(obj, 'text', None))
 
 
 def has_text_method(obj: object) -> TypeGuard[ResponseProtocol]:
     """Type guard for objects with text() method."""
-    return hasattr(obj, 'text') and callable(getattr(obj, 'text'))
+    return hasattr(obj, 'text') and callable(getattr(obj, 'text', None))
 
 
 def has_content_attr(obj: object) -> TypeGuard[ResponseWithContent]:
@@ -90,63 +133,63 @@ def has_response_attr(obj: object) -> TypeGuard[HTTPErrorWithResponse]:
     """Type guard for errors with response attribute and status_code."""
     if not hasattr(obj, 'response'):
         return False
-    
-    response = getattr(obj, 'response')
-    if not hasattr(response, 'status_code'):
+
+    response = getattr(obj, 'response', None)
+    if response is None or not hasattr(response, 'status_code'):
         return False
-    
-    status_code = getattr(response, 'status_code')
+
+    status_code = getattr(response, 'status_code', None)
     return isinstance(status_code, int)
 
 
-def has_temperature_attr(obj: object) -> TypeGuard[object]:
+def has_temperature_attr(obj: object) -> TypeGuard[HasTemperature]:
     """Type guard for objects with temperature attribute."""
-    return hasattr(obj, 'temperature') and (
-        getattr(obj, 'temperature') is None or 
-        isinstance(getattr(obj, 'temperature'), (int, float))
-    )
+    if not hasattr(obj, 'temperature'):
+        return False
+    temperature = getattr(obj, 'temperature', None)
+    return temperature is None or isinstance(temperature, (int, float))
 
 
-def has_max_completion_tokens_attr(obj: object) -> TypeGuard[object]:
+def has_max_completion_tokens_attr(obj: object) -> TypeGuard[HasMaxCompletionTokens]:
     """Type guard for objects with max_completion_tokens attribute."""
-    return hasattr(obj, 'max_completion_tokens') and (
-        getattr(obj, 'max_completion_tokens') is None or 
-        isinstance(getattr(obj, 'max_completion_tokens'), int)
-    )
+    if not hasattr(obj, 'max_completion_tokens'):
+        return False
+    max_completion_tokens = getattr(obj, 'max_completion_tokens', None)
+    return max_completion_tokens is None or isinstance(max_completion_tokens, int)
 
 
-def has_tools_attr(obj: object) -> TypeGuard[object]:
+def has_tools_attr(obj: object) -> TypeGuard[HasTools]:
     """Type guard for objects with tools attribute."""
-    return hasattr(obj, 'tools') and (
-        getattr(obj, 'tools') is None or 
-        isinstance(getattr(obj, 'tools'), list)
-    )
+    if not hasattr(obj, 'tools'):
+        return False
+    tools = getattr(obj, 'tools', None)
+    return tools is None or isinstance(tools, list)
 
 
-def has_tool_choice_attr(obj: object) -> TypeGuard[object]:
+def has_tool_choice_attr(obj: object) -> TypeGuard[HasToolChoice]:
     """Type guard for objects with tool_choice attribute."""
     return hasattr(obj, 'tool_choice')
 
 
-def has_response_format_attr(obj: object) -> TypeGuard[object]:
+def has_response_format_attr(obj: object) -> TypeGuard[HasResponseFormat]:
     """Type guard for objects with response_format attribute."""
     return hasattr(obj, 'response_format')
 
 
-def has_reasoning_effort_attr(obj: object) -> TypeGuard[object]:
+def has_reasoning_effort_attr(obj: object) -> TypeGuard[HasReasoningEffort]:
     """Type guard for objects with reasoning_effort attribute."""
-    return hasattr(obj, 'reasoning_effort') and (
-        getattr(obj, 'reasoning_effort') is None or 
-        isinstance(getattr(obj, 'reasoning_effort'), str)
-    )
+    if not hasattr(obj, 'reasoning_effort'):
+        return False
+    reasoning_effort = getattr(obj, 'reasoning_effort', None)
+    return reasoning_effort is None or isinstance(reasoning_effort, str)
 
 
-def has_use_messages_endpoint_attr(obj: object) -> TypeGuard[object]:
+def has_use_messages_endpoint_attr(obj: object) -> TypeGuard[HasUseMessagesEndpoint]:
     """Type guard for objects with use_messages_endpoint attribute."""
-    return hasattr(obj, 'use_messages_endpoint') and (
-        getattr(obj, 'use_messages_endpoint') is None or 
-        isinstance(getattr(obj, 'use_messages_endpoint'), bool)
-    )
+    if not hasattr(obj, 'use_messages_endpoint'):
+        return False
+    use_messages_endpoint = getattr(obj, 'use_messages_endpoint', None)
+    return use_messages_endpoint is None or isinstance(use_messages_endpoint, bool)
 
 
 console = Console()
@@ -159,14 +202,14 @@ _current_api_key: Optional[str] = None
 
 class GrokMixin(LLMKeyModel):
     """Mixin class containing all Grok implementation."""
-    
+
     can_stream: bool = True
     needs_key: Optional[str] = "grok"
     key_env_var: Optional[str] = "XAI_API_KEY"
-    
+
     class Options(LLMOptionsBase):  # pyright: ignore[reportIncompatibleVariableOverride]
         """Grok-specific options with LLM framework compatibility."""
-        
+
         temperature: Optional[float] = Field(default=0.0)
         max_completion_tokens: Optional[int] = Field(default=None)
         tools: Optional[list[ToolDefinition]] = Field(default=None)
@@ -175,7 +218,7 @@ class GrokMixin(LLMKeyModel):
         reasoning_effort: Optional[str] = Field(default=None)
         use_messages_endpoint: bool = Field(default=False)
         max_tokens: Optional[int] = Field(default=None)  # LLMOptionsProtocol compatibility
-        
+
         def model_post_init(self, __context: Any) -> None:
             # LLMOptionsProtocol compatibility - sync max_tokens with max_completion_tokens
             if self.max_completion_tokens is not None:
@@ -223,7 +266,7 @@ class GrokMixin(LLMKeyModel):
     def _build_message_content(self, prompt: llm.Prompt) -> Union[str, list[Union[TextContent, ImageContent]]]:
         """Build message content, handling multimodal inputs for vision-capable models."""
         supports_vision = self._get_model_capability("supports_vision")
-        
+
         if supports_vision and hasattr(prompt, 'attachments') and prompt.attachments:
             return self._image_processor.process_prompt_with_attachments(prompt)
         else:
@@ -238,7 +281,7 @@ class GrokMixin(LLMKeyModel):
         """Validate and convert content list format."""
         if isinstance(content, str):
             return content
-        
+
         if isinstance(content, list):
             for i, item in enumerate(content):
                 if isinstance(item, dict):
@@ -246,16 +289,16 @@ class GrokMixin(LLMKeyModel):
                         raise ValueError(f"Content item {i} missing 'type' field")
                     if item["type"] not in ["text", "image_url"]:
                         raise ValueError(f"Content item {i} has invalid type: {item['type']}")
-                    
+
                     if item["type"] == "text" and "text" not in item:
                         raise ValueError(f"Text content item {i} missing 'text' field")
                     if item["type"] == "image_url" and "image_url" not in item:
                         raise ValueError(f"Image content item {i} missing 'image_url' field")
                 else:
                     raise ValueError(f"Content item {i} must be a dictionary")
-            
+
             return content
-        
+
         raise ValueError("Content must be either string or list of content items")
 
     def _convert_tools_for_anthropic(
@@ -277,21 +320,21 @@ class GrokMixin(LLMKeyModel):
     def build_messages(self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]) -> list[Message]:
         """Build message array for API request."""
         messages: list[Message] = []
-        
+
         # Add system message if present
         if hasattr(prompt, 'system') and prompt.system:
             messages.append({
                 "role": "system",
                 "content": prompt.system
             })
-        
+
         if conversation:
             for prev_response in conversation.responses:
                 messages.append({
                     "role": "user",
                     "content": prev_response.prompt.prompt
                 })
-                
+
                 # Safely get response text using type guards
                 response_text = ""
                 if has_text_method(prev_response):
@@ -300,18 +343,18 @@ class GrokMixin(LLMKeyModel):
                     response_text = str(prev_response.content)
                 else:
                     response_text = str(prev_response)
-                
+
                 messages.append({
-                    "role": "assistant", 
+                    "role": "assistant",
                     "content": response_text
                 })
-        
+
         content = self._build_message_content(prompt)
         messages.append({
             "role": "user",
             "content": content
         })
-        
+
         return messages
 
     def execute(
@@ -329,49 +372,49 @@ class GrokMixin(LLMKeyModel):
                 raise ValueError(f"API key not found. Set {self.key_env_var} environment variable")
             client = self._get_client(api_key)
             messages = self.build_messages(prompt, conversation)
-            
-            body: Dict[str, Any] = {
+
+            body: dict[str, Any] = {
                 "model": self.model_id,
                 "messages": messages,
                 "stream": stream
             }
-            
+
             grok_options = self.Options()
             # Extract options from prompt.options using type guards for type safety
             options = prompt.options
             if options:
                 if has_temperature_attr(options):
-                    temperature = getattr(options, 'temperature')
+                    temperature = options.temperature
                     if temperature is not None:
                         grok_options.temperature = temperature
-                
+
                 if has_max_completion_tokens_attr(options):
-                    max_completion_tokens = getattr(options, 'max_completion_tokens')
+                    max_completion_tokens = options.max_completion_tokens
                     if max_completion_tokens is not None:
                         grok_options.max_completion_tokens = max_completion_tokens
-                
+
                 if has_tools_attr(options):
-                    tools = getattr(options, 'tools')
+                    tools = options.tools
                     if tools is not None:
                         grok_options.tools = tools
-                
+
                 if has_tool_choice_attr(options):
-                    tool_choice = getattr(options, 'tool_choice')
+                    tool_choice = options.tool_choice
                     if tool_choice is not None:
                         grok_options.tool_choice = tool_choice
-                
+
                 if has_response_format_attr(options):
-                    response_format = getattr(options, 'response_format')
+                    response_format = options.response_format
                     if response_format is not None:
                         grok_options.response_format = response_format
-                
+
                 if has_reasoning_effort_attr(options):
-                    reasoning_effort = getattr(options, 'reasoning_effort')
+                    reasoning_effort = options.reasoning_effort
                     if reasoning_effort is not None:
                         grok_options.reasoning_effort = reasoning_effort
-                
+
                 if has_use_messages_endpoint_attr(options):
-                    use_messages_endpoint = getattr(options, 'use_messages_endpoint')
+                    use_messages_endpoint = options.use_messages_endpoint
                     if use_messages_endpoint is not None:
                         grok_options.use_messages_endpoint = use_messages_endpoint
 
@@ -405,7 +448,7 @@ class GrokMixin(LLMKeyModel):
                 yield from self._handle_non_streaming_response(
                     client, endpoint_url, formatted_body, response, grok_options
                 )
-                
+
         except Exception as e:
             self._handle_error(e, "execution")
             raise
@@ -414,7 +457,7 @@ class GrokMixin(LLMKeyModel):
         self,
         client: GrokClient,
         endpoint_url: str,
-        body: Dict[str, Any],
+        body: dict[str, Any],
         response: llm.Response,
         options: "GrokMixin.Options"
     ) -> Iterator[str]:
@@ -444,7 +487,7 @@ class GrokMixin(LLMKeyModel):
                     response_format=body.get("response_format"),
                     reasoning_effort=body.get("reasoning_effort")
                 )
-            
+
             # Type narrowing: streaming responses are context managers
             if isinstance(http_response, AbstractContextManager):
                 with http_response as response_stream:
@@ -456,7 +499,7 @@ class GrokMixin(LLMKeyModel):
                 for chunk_text in self._stream_processor.process_stream(http_response, response, options.use_messages_endpoint):
                     if chunk_text:
                         yield chunk_text
-        
+
         except Exception as e:
             self._handle_error(e, "streaming")
             raise
@@ -465,7 +508,7 @@ class GrokMixin(LLMKeyModel):
         self,
         client: GrokClient,
         endpoint_url: str,
-        body: Dict[str, Any],
+        body: dict[str, Any],
         response: llm.Response,
         options: "GrokMixin.Options"
     ) -> Iterator[str]:
@@ -495,13 +538,13 @@ class GrokMixin(LLMKeyModel):
                     response_format=body.get("response_format"),
                     reasoning_effort=body.get("reasoning_effort")
                 )
-            
+
             # Type narrowing: non-streaming responses return httpx.Response directly
             if isinstance(http_response, httpx.Response):
                 api_response = http_response.json()
             else:
                 raise ValueError("Invalid response type from client")
-            
+
             # Extract content based on format
             if options.use_messages_endpoint:
                 # Anthropic format
@@ -511,24 +554,24 @@ class GrokMixin(LLMKeyModel):
                         # Extract text from content blocks
                         text_parts = []
                         tool_calls_found = False
-                        
+
                         for block in content:
                             if isinstance(block, dict):
                                 if block.get("type") == "text":
                                     text_parts.append(block.get("text", ""))
                                 elif block.get("type") == "tool_use":
                                     tool_calls_found = True
-                        
+
                         # Process tool calls if found
                         if tool_calls_found:
                             processed_tool_calls = self._tool_processor.process(api_response)
                             if processed_tool_calls:
                                 self._tool_processor.process_tool_calls(response, processed_tool_calls)
-                        
+
                         text_response = "".join(text_parts)
                     else:
                         text_response = str(content)
-                    
+
                     if text_response:
                         yield text_response
             else:
@@ -537,17 +580,17 @@ class GrokMixin(LLMKeyModel):
                     choice = api_response["choices"][0]
                     message = choice.get("message", {})
                     content = message.get("content", "")
-                    
+
                     # Extract and process tool calls
                     tool_calls = message.get("tool_calls", [])
                     if tool_calls:
                         processed_tool_calls = self._tool_processor.process(api_response)
                         if processed_tool_calls:
                             self._tool_processor.process_tool_calls(response, processed_tool_calls)
-                    
+
                     if content:
                         yield content
-        
+
         except Exception as e:
             self._handle_error(e, "non-streaming")
             raise
@@ -569,7 +612,7 @@ class GrokMixin(LLMKeyModel):
                 "1. Set the XAI_API_KEY environment variable\n"
                 "2. Use: llm keys set grok <your-api-key>\n\n"
                 "Get your API key from: https://x.ai",
-                title="Authentication Error", 
+                title="Authentication Error",
                 border_style="red"
             )
         elif isinstance(error, (QuotaExceededError, RateLimitError)):

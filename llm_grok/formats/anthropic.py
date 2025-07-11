@@ -166,10 +166,10 @@ class AnthropicFormatHandler(FormatHandler):
 
     def convert_from_openai(self, openai_request: dict[str, Any]) -> dict[str, Any]:
         """Convert a full OpenAI request to Anthropic format.
-        
+
         Args:
             openai_request: Complete OpenAI request including messages, tools, etc.
-            
+
         Returns:
             Complete Anthropic request ready for the API
         """

@@ -7,7 +7,7 @@ establishing the contract for converting between different API formats.
 import ipaddress
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 from urllib.parse import unquote, urlparse
 
 from ..constants import (
@@ -30,7 +30,7 @@ __all__ = ["FormatHandler"]
 
 class FormatHandler(ABC):
     """Abstract base class for API format handlers.
-    
+
     Format handlers are responsible for converting between different API formats
     (e.g., OpenAI <-> Anthropic) while maintaining type safety and preserving
     all relevant information.
@@ -38,107 +38,107 @@ class FormatHandler(ABC):
 
     def __init__(self, model_id: str) -> None:
         """Initialize the format handler.
-        
+
         Args:
             model_id: The model identifier for response metadata
         """
         self.model_id = model_id
 
     @abstractmethod
-    def convert_messages_to_anthropic(self, openai_messages: List[Message]) -> AnthropicRequest:
+    def convert_messages_to_anthropic(self, openai_messages: list[Message]) -> AnthropicRequest:
         """Convert OpenAI-style messages to Anthropic format.
-        
+
         This method handles:
         - System message extraction and combination
         - Role mapping (system -> system field)
         - Multimodal content conversion
         - Tool call format conversion
-        
+
         Args:
             openai_messages: List of OpenAI-format messages
-            
+
         Returns:
             Dict with 'messages' and optionally 'system', suitable for Anthropic API
         """
         pass
 
     @abstractmethod
-    def convert_tools_to_anthropic(self, openai_tools: List[ToolDefinition]) -> List[AnthropicToolDefinition]:
+    def convert_tools_to_anthropic(self, openai_tools: list[ToolDefinition]) -> list[AnthropicToolDefinition]:
         """Convert OpenAI tool definitions to Anthropic format.
-        
+
         Args:
             openai_tools: List of OpenAI tool definitions
-            
+
         Returns:
             List of Anthropic tool definitions
         """
         pass
 
     @abstractmethod
-    def convert_from_anthropic_response(self, anthropic_response: Dict[str, Any]) -> OpenAIResponse:
+    def convert_from_anthropic_response(self, anthropic_response: dict[str, Any]) -> OpenAIResponse:
         """Convert Anthropic response to OpenAI format.
-        
+
         This method handles:
         - Response structure conversion
         - Content extraction and formatting
         - Tool use to tool calls conversion
         - Usage statistics mapping
-        
+
         Args:
             anthropic_response: Raw Anthropic API response
-            
+
         Returns:
             OpenAI-format response
         """
         pass
 
     @abstractmethod
-    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, Dict[str, Any]]]:
+    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, dict[str, Any]]]:
         """Parse Server-Sent Events chunks from either API format.
-        
+
         This method should handle both OpenAI and Anthropic SSE formats,
         detecting the format and parsing accordingly.
-        
+
         Args:
             chunk: Raw SSE chunk bytes
-            
+
         Yields:
             Parsed event data (format depends on the API)
         """
         pass
 
     @abstractmethod
-    def parse_openai_sse(self, buffer: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    def parse_openai_sse(self, buffer: str) -> tuple[Optional[dict[str, Any]], str]:
         """Parse OpenAI SSE format and return parsed data and remaining buffer.
-        
+
         Args:
             buffer: Current SSE buffer content
-            
+
         Returns:
             Tuple of (parsed_data, remaining_buffer)
         """
         pass
 
     @abstractmethod
-    def parse_anthropic_sse(self, buffer: str) -> Tuple[Optional[Tuple[str, Dict[str, Any]]], str]:
+    def parse_anthropic_sse(self, buffer: str) -> tuple[Optional[tuple[str, dict[str, Any]]], str]:
         """Parse Anthropic SSE format and return event data and remaining buffer.
-        
+
         Args:
             buffer: Current SSE buffer content
-            
+
         Returns:
             Tuple of ((event_type, event_data), remaining_buffer) or (None, buffer)
         """
         pass
 
     @abstractmethod
-    def convert_anthropic_stream_chunk(self, event_type: str, event_data: Dict[str, Any]) -> Optional[OpenAIStreamChunk]:
+    def convert_anthropic_stream_chunk(self, event_type: str, event_data: dict[str, Any]) -> Optional[OpenAIStreamChunk]:
         """Convert Anthropic streaming event to OpenAI format chunk.
-        
+
         Args:
             event_type: Anthropic event type (e.g., "content_block_delta")
             event_data: Event data payload
-            
+
         Returns:
             OpenAI format chunk or None if event should be skipped
         """
@@ -146,16 +146,16 @@ class FormatHandler(ABC):
 
     def validate_image_format(self, image_url: str) -> str:
         """Validate and potentially transform image data format.
-        
+
         This base implementation can be overridden by specific handlers
         if they need custom image validation logic.
-        
+
         Args:
             image_url: Image URL or data URL
-            
+
         Returns:
             Validated/transformed image URL
-            
+
         Raises:
             ValueError: If image format is invalid
         """
@@ -179,19 +179,19 @@ class FormatHandler(ABC):
 
     def validate_image_url(self, url: str) -> str:
         """Validate URL to prevent SSRF attacks.
-        
+
         This method checks URLs against common SSRF attack patterns including:
         - Localhost and loopback addresses (127.0.0.1, ::1, etc.)
         - Private IP ranges (10.x, 192.168.x, 172.16.x, etc.)
         - Reserved IP addresses
         - Non-HTTP(S) schemes (file://, gopher://, etc.)
-        
+
         Args:
             url: URL to validate
-            
+
         Returns:
             The validated URL (unchanged if valid)
-            
+
         Raises:
             ValidationError: If the URL is potentially dangerous or invalid
         """
@@ -202,7 +202,7 @@ class FormatHandler(ABC):
         try:
             parsed = urlparse(url)
         except Exception as e:
-            raise ValidationError(f"Invalid URL format: {str(e)}")
+            raise ValidationError(f"Invalid URL format: {str(e)}") from e
 
         # Check scheme - only allow http/https
         if parsed.scheme not in ['http', 'https']:
@@ -273,13 +273,13 @@ class FormatHandler(ABC):
 
             # Block various forms of localhost
             if any(blocked in hostname_lower for blocked in ['localhost', '127.0.0.1', '::1']):
-                raise ValidationError(f"Suspicious hostname pattern detected: {hostname}")
+                raise ValidationError(f"Suspicious hostname pattern detected: {hostname}") from None
 
             # Block internal-looking domains
             if hostname_lower.endswith(('.local', '.internal', '.localhost', '.lan')):
                 raise ValidationError(
                     f"Access to internal domain '{hostname}' is not allowed"
-                )
+                ) from None
 
         # Check for port restrictions (optional, but recommended for some services)
         if parsed.port:

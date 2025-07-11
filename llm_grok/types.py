@@ -4,9 +4,9 @@ This module contains all TypedDict and type definitions for both OpenAI and Anth
 All types follow strict type safety guidelines with no use of Any where avoidable.
 """
 
-from typing import Any, Literal, Optional, Union, Protocol, runtime_checkable
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
+from typing import Any, Literal, Optional, Protocol, Union, runtime_checkable
 
 from typing_extensions import NotRequired, Required, TypedDict, TypeGuard
 
@@ -62,9 +62,9 @@ __all__ = [
     "FunctionCall",
     "FunctionCallDetails",
     "ToolCall",
-    "ToolCallWithIndex", 
+    "ToolCallWithIndex",
     "RawFunctionCall",
-    "RawToolCall", 
+    "RawToolCall",
     "BaseMessage",
     "Message",
     "ToolDefinition",
@@ -98,8 +98,9 @@ __all__ = [
     "RequestBody",
     # Protocol interfaces
     "LLMModelProtocol",
-    "LLMOptionsProtocol", 
+    "LLMOptionsProtocol",
     "LLMPromptProtocol",
+    "GrokOptionsProtocol",
     "HTTPResponse",
     "HTTPClient",
     # Type guards
@@ -355,7 +356,7 @@ class ToolChoice(TypedDict):
 class LLMModelProtocol(Protocol):
     """Protocol for LLM framework model interface."""
     model_id: str
-    
+
     def execute(self, prompt: Any, options: Any) -> Any: ...
     def __init__(self, model_id: str) -> None: ...
 
@@ -374,11 +375,31 @@ class LLMPromptProtocol(Protocol):
     attachments: Optional[list[Any]]
 
 
+@runtime_checkable
+class GrokOptionsProtocol(Protocol):
+    """Comprehensive protocol for Grok plugin options.
+
+    Extends basic LLM options with Grok-specific attributes.
+    All attributes are optional to support partial options objects.
+    """
+    # Basic LLM options
+    temperature: Optional[Union[int, float]]
+    max_tokens: Optional[int]
+    max_completion_tokens: Optional[int]
+
+    # Grok-specific options
+    tools: Optional[list[Any]]
+    tool_choice: Any
+    response_format: Any
+    reasoning_effort: Optional[str]
+    use_messages_endpoint: Optional[bool]
+
+
 class HTTPResponse(Protocol):
     """Protocol for HTTP response objects."""
     status_code: int
     headers: dict[str, str]
-    
+
     def raise_for_status(self) -> None: ...
     def json(self) -> dict[str, Any]: ...
     def iter_lines(self) -> Iterator[str]: ...
@@ -386,7 +407,7 @@ class HTTPResponse(Protocol):
 
 class HTTPClient(Protocol):
     """Protocol for HTTP client objects."""
-    
+
     def post(
         self,
         url: str,
@@ -395,7 +416,7 @@ class HTTPClient(Protocol):
         headers: Optional[dict[str, str]] = None,
         timeout: Optional[float] = None
     ) -> HTTPResponse: ...
-    
+
     def stream(
         self,
         method: str,
@@ -454,10 +475,10 @@ class FunctionChoice(TypedDict):
 # Type guards for runtime safety
 def is_model_info_complete(obj: Any) -> TypeGuard[ModelInfo]:
     """Type guard to check if an object is a complete ModelInfo.
-    
+
     Args:
         obj: Object to check
-        
+
     Returns:
         True if the object has all required ModelInfo fields
     """

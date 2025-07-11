@@ -103,10 +103,10 @@ MODEL_INFO: dict[str, ModelInfo] = {
 
 def get_model_info_safe(model_id: str) -> ModelInfo:
     """Get model information with proper typing and defaults.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         Model information with safe defaults
     """
@@ -123,11 +123,11 @@ def get_model_info_safe(model_id: str) -> ModelInfo:
 
 def get_model_capability(model_id: str, capability: str) -> bool:
     """Get a specific capability for a model.
-    
+
     Args:
         model_id: The model identifier
         capability: The capability to check (e.g., 'supports_vision', 'supports_tools')
-        
+
     Returns:
         True if the model has the capability, False otherwise
     """
@@ -137,10 +137,10 @@ def get_model_capability(model_id: str, capability: str) -> bool:
 
 def validate_model_id(model_id: str) -> bool:
     """Validate if a model ID is supported.
-    
+
     Args:
         model_id: The model identifier to validate
-        
+
     Returns:
         True if the model is supported, False otherwise
     """
@@ -149,10 +149,10 @@ def validate_model_id(model_id: str) -> bool:
 
 def get_model_info(model_id: str) -> Optional[ModelInfo]:
     """Get complete model information.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         Model information dictionary or None if not found
     """
@@ -161,10 +161,10 @@ def get_model_info(model_id: str) -> Optional[ModelInfo]:
 
 def is_vision_capable(model_id: str) -> bool:
     """Check if a model supports vision/image inputs.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         True if the model supports vision, False otherwise
     """
@@ -173,10 +173,10 @@ def is_vision_capable(model_id: str) -> bool:
 
 def is_tool_capable(model_id: str) -> bool:
     """Check if a model supports tool/function calling.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         True if the model supports tools, False otherwise
     """
@@ -185,10 +185,10 @@ def is_tool_capable(model_id: str) -> bool:
 
 def get_context_window(model_id: str) -> Optional[int]:
     """Get the context window size for a model.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         Context window size in tokens or None if not found
     """
@@ -198,10 +198,10 @@ def get_context_window(model_id: str) -> Optional[int]:
 
 def get_max_output_tokens(model_id: str) -> Optional[int]:
     """Get the maximum output tokens for a model.
-    
+
     Args:
         model_id: The model identifier
-        
+
     Returns:
         Maximum output tokens or None if not found
     """

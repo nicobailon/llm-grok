@@ -20,7 +20,7 @@ __all__ = [
 
 class GrokError(Exception):
     """Base exception for all Grok API errors.
-    
+
     Attributes:
         message: Human-readable error message
         details: Additional error details from the API
@@ -47,7 +47,7 @@ class GrokError(Exception):
 
 class RateLimitError(GrokError):
     """Exception raised when API rate limit is exceeded.
-    
+
     Attributes:
         retry_after: Seconds to wait before retrying (if provided by API)
     """
@@ -64,7 +64,7 @@ class RateLimitError(GrokError):
 
 class QuotaExceededError(GrokError):
     """Exception raised when API quota is exceeded.
-    
+
     This typically indicates the account has reached its usage limits.
     """
 
@@ -78,9 +78,9 @@ class QuotaExceededError(GrokError):
 
 class ValidationError(GrokError):
     """Exception raised for validation failures.
-    
+
     This includes invalid parameters, malformed requests, or data format issues.
-    
+
     Attributes:
         field: The specific field that failed validation (if applicable)
     """
@@ -97,9 +97,9 @@ class ValidationError(GrokError):
 
 class ConversionError(GrokError):
     """Exception raised during format conversion between APIs.
-    
+
     This occurs when converting between OpenAI and Anthropic formats fails.
-    
+
     Attributes:
         source_format: The format being converted from
         target_format: The format being converted to
@@ -119,7 +119,7 @@ class ConversionError(GrokError):
 
 class APIError(GrokError):
     """General API error for non-specific failures.
-    
+
     Attributes:
         status_code: HTTP status code from the API
     """
@@ -136,7 +136,7 @@ class APIError(GrokError):
 
 class AuthenticationError(GrokError):
     """Exception raised for authentication failures.
-    
+
     This indicates issues with API key or authorization.
     """
 
@@ -150,9 +150,9 @@ class AuthenticationError(GrokError):
 
 class NetworkError(GrokError):
     """Exception raised for network-related failures.
-    
+
     This includes timeouts, connection errors, and DNS failures.
-    
+
     Attributes:
         original_error: The underlying network exception if available
     """

@@ -2,9 +2,7 @@
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any, Dict, List, Optional
-
-from llm_grok.processors import ContentProcessor, ProcessorConfig
+from typing import Any, Optional
 
 from ..constants import (
     DEFAULT_ENCODING,
@@ -12,11 +10,12 @@ from ..constants import (
 )
 from ..formats import AnthropicFormatHandler, OpenAIFormatHandler
 from ..types import StreamEvent
+from llm_grok.processors import ContentProcessor, ProcessorConfig
 
 logger = logging.getLogger(__name__)
 
 
-class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]]):
+class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[dict[str, Any]]]):
     """Handles streaming response processing."""
 
     def __init__(self, model_id: str, config: Optional[ProcessorConfig] = None):
@@ -31,18 +30,18 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
         """Get processor configuration."""
         return self._config
 
-    def process(self, content: Iterator[bytes]) -> Iterator[Dict[str, Any]]:
+    def process(self, content: Iterator[bytes]) -> Iterator[dict[str, Any]]:
         """Process raw byte stream and yield structured events.
-        
+
         Handles both OpenAI and Anthropic SSE formats, parsing the stream
         and emitting typed events for content, tool calls, errors, and completion.
-        
+
         Args:
             content: Iterator of raw bytes from HTTP response
-            
+
         Yields:
             Structured event dictionaries with type and data
-            
+
         Raises:
             ValueError: If buffer exceeds maximum size
         """
@@ -53,7 +52,7 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
 
         # Track accumulated state
         accumulated_content = ""
-        accumulated_tool_calls: List[Dict[str, Any]] = []
+        accumulated_tool_calls: list[dict[str, Any]] = []
 
         for chunk in stream:
             if chunk:
@@ -73,7 +72,7 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
                     parsed_data, remaining_buffer = self._openai_formatter.parse_openai_sse(buffer)
                     if parsed_data is None:
                         break
-                    
+
                     # Update buffer with remaining content after successful parse
                     buffer = remaining_buffer
 
@@ -123,13 +122,13 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
 
     def validate(self, event: StreamEvent) -> bool:
         """Validate a streaming event structure.
-        
+
         Args:
             event: Streaming event to validate
-            
+
         Returns:
             True if event is valid
-            
+
         Raises:
             ValueError: If event structure is invalid
         """
@@ -163,10 +162,10 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
         return True
 
     def _accumulate_streaming_tool_call(
-        self, accumulator: List[Dict[str, Any]], delta: Dict[str, Any]
+        self, accumulator: list[dict[str, Any]], delta: dict[str, Any]
     ) -> None:
         """Accumulate incremental tool call data from stream.
-        
+
         Args:
             accumulator: List to accumulate tool calls into
             delta: Incremental tool call data
@@ -202,12 +201,12 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
 
     def process_stream(self, http_response: Any, response: Any, use_messages: bool) -> Iterator[str]:
         """Process streaming HTTP response and yield content.
-        
+
         Args:
             http_response: The streaming HTTP response
             response: The LLM response object to accumulate tool calls
             use_messages: Whether this is using the Anthropic messages endpoint
-            
+
         Yields:
             Content strings as they arrive
         """
@@ -262,7 +261,7 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
         # Finalize tool calls after streaming completes
         self._finalize_tool_calls(response)
 
-    def _process_stream_delta(self, delta: Dict[str, Any], response: Any) -> Optional[str]:
+    def _process_stream_delta(self, delta: dict[str, Any], response: Any) -> Optional[str]:
         """Process a stream delta and return content to yield, if any."""
         content_to_yield = None
 
@@ -279,7 +278,7 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
 
         return content_to_yield
 
-    def _accumulate_tool_call(self, response: Any, tool_call: Dict[str, Any]) -> None:
+    def _accumulate_tool_call(self, response: Any, tool_call: dict[str, Any]) -> None:
         """Helper to accumulate streaming tool call data."""
         # Initialize accumulator if not exists
         if not hasattr(response, '_tool_calls_accumulator'):

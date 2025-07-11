@@ -55,7 +55,7 @@ class OpenAIFormatHandler(FormatHandler):
 
     def parse_openai_sse(self, buffer: str) -> tuple[Optional[dict[str, Any]], str]:
         """Alias for parse_sse for compatibility.
-        
+
         .. deprecated:: 3.0
             Use parse_sse() directly instead.
         """
@@ -69,10 +69,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def convert_messages_to_anthropic(self, openai_messages: list[Message]) -> AnthropicRequest:
         """Convert OpenAI-style messages to Anthropic format.
-        
+
         Args:
             openai_messages: List of OpenAI-format messages
-            
+
         Returns:
             Dict with 'messages', 'system' (optional), suitable for Anthropic API
         """
@@ -87,10 +87,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _extract_system_prompts(self, messages: list[Message]) -> list[str]:
         """Extract and combine system messages from OpenAI messages.
-        
+
         Args:
             messages: List of OpenAI-format messages
-            
+
         Returns:
             List of system prompt strings
         """
@@ -111,10 +111,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_user_assistant_messages(self, messages: list[Message]) -> list[AnthropicMessage]:
         """Convert user and assistant messages to Anthropic format.
-        
+
         Args:
             messages: List of OpenAI-format messages
-            
+
         Returns:
             List of Anthropic-format messages
         """
@@ -130,10 +130,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_single_message(self, msg: Message) -> AnthropicMessage:
         """Convert a single OpenAI message to Anthropic format.
-        
+
         Args:
             msg: OpenAI-format message
-            
+
         Returns:
             Anthropic-format message
         """
@@ -165,10 +165,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_multimodal_content(self, content: list[Union[TextContent, ImageContent]]) -> list[Union[AnthropicTextBlock, AnthropicImage]]:
         """Convert multimodal content to Anthropic format.
-        
+
         Args:
             content: List of OpenAI content items
-            
+
         Returns:
             List of Anthropic content blocks
         """
@@ -190,10 +190,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_image_content(self, image_content: ImageContent) -> Optional[AnthropicImage]:
         """Convert OpenAI image content to Anthropic format.
-        
+
         Args:
             image_content: OpenAI image content
-            
+
         Returns:
             Anthropic image block or None if URL is not supported
         """
@@ -203,7 +203,7 @@ class OpenAIFormatHandler(FormatHandler):
         if not image_url.startswith("data:"):
             try:
                 # Validate the URL to prevent SSRF attacks
-                validated_url = self.validate_image_url(image_url)
+                self.validate_image_url(image_url)
                 # Anthropic doesn't support direct URLs, so skip after validation
                 return None
             except ValidationError:
@@ -232,10 +232,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_tool_calls(self, tool_calls: list[ToolCall]) -> list[AnthropicToolUse]:
         """Convert OpenAI tool calls to Anthropic tool use format.
-        
+
         Args:
             tool_calls: List of OpenAI tool calls
-            
+
         Returns:
             List of Anthropic tool use blocks
         """
@@ -260,10 +260,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def convert_tools_to_anthropic(self, openai_tools: list[ToolDefinition]) -> list[AnthropicToolDefinition]:
         """Convert OpenAI tool definitions to Anthropic format.
-        
+
         Args:
             openai_tools: List of OpenAI-format tool definitions
-            
+
         Returns:
             List of Anthropic-format tool definitions
         """
@@ -283,10 +283,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def convert_tool_choice_to_anthropic(self, tool_choice: Union[Literal["auto", "none"], ToolChoice]) -> Optional[Union[Literal["auto"], AnthropicToolChoice]]:
         """Convert OpenAI tool choice to Anthropic format.
-        
+
         Args:
             tool_choice: OpenAI tool choice specification
-            
+
         Returns:
             Anthropic tool choice or None
         """
@@ -483,7 +483,7 @@ class OpenAIFormatHandler(FormatHandler):
 
     def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, dict[str, Any]]]:
         """Parse Server-Sent Events chunks from either API format.
-        
+
         This implementation focuses on OpenAI format parsing.
         """
         text = chunk.decode("utf-8", errors="ignore")
@@ -508,10 +508,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def convert_from_anthropic(self, anthropic_data: dict[str, Any]) -> dict[str, Any]:
         """Convert Anthropic format data to OpenAI format.
-        
+
         Args:
             anthropic_data: Anthropic-format request data
-            
+
         Returns:
             OpenAI-format request data
         """
@@ -573,7 +573,7 @@ class OpenAIFormatHandler(FormatHandler):
     def _convert_anthropic_message_to_openai(self, msg: AnthropicMessage) -> Message:
         """Convert a single Anthropic message to OpenAI format."""
         openai_msg: Message
-        
+
         if isinstance(msg["content"], str):
             openai_msg = {"role": msg["role"], "content": msg["content"]}
         elif isinstance(msg["content"], list):
