@@ -36,7 +36,7 @@ class TestOpenAITypes:
         # Get type hints to verify typing
         hints = get_type_hints(ImageContent)
         assert hints["type"] == Literal["image_url"]
-        assert hints["image_url"] == Dict[str, str]
+        assert hints["image_url"] == dict[str, str]
     
     def test_text_content_structure(self) -> None:
         """Test TextContent TypedDict structure."""

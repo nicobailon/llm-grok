@@ -2,7 +2,7 @@
 import sys
 import threading
 from collections.abc import Iterator
-from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, TypeGuard, Dict, Any
+from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, TypeGuard, Dict, Any, ClassVar
 
 import httpx
 import llm
@@ -11,13 +11,22 @@ from rich import print as rprint
 from rich.console import Console
 from rich.panel import Panel
 
-try:
-    from llm import KeyModel
-    from llm import Options as LLMOptionsBase
+if TYPE_CHECKING:
+    from llm import KeyModel as LLMKeyModel
+    from llm.models import Options as LLMOptionsBase
     LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    LLMOptionsBase = object  # Simple fallback
+else:
+    try:
+        from llm import KeyModel as LLMKeyModel
+        from llm.models import Options as LLMOptionsBase
+        LLM_AVAILABLE = True
+    except ImportError:
+        LLM_AVAILABLE = False
+        # Create a proper base class for fallback
+        class LLMOptionsBase:
+            pass
+        class LLMKeyModel:
+            pass
 
 from .client import GrokClient
 from .exceptions import (
@@ -108,40 +117,36 @@ _client_lock = threading.Lock()
 _current_api_key: Optional[str] = None
 
 
-class GrokOptions:
+class GrokOptions(LLMOptionsBase):
     """Grok-specific options with LLM framework compatibility."""
     
-    def __init__(
-        self,
-        temperature: Optional[float] = None,
-        max_completion_tokens: Optional[int] = None,
-        tools: Optional[list[ToolDefinition]] = None,
-        tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = None,
-        response_format: Optional[ResponseFormat] = None,
-        reasoning_effort: Optional[str] = None,
-        use_messages_endpoint: bool = False,
-    ) -> None:
-        self.temperature = temperature
-        self.max_completion_tokens = max_completion_tokens
-        self.tools = tools
-        self.tool_choice = tool_choice
-        self.response_format = response_format
-        self.reasoning_effort = reasoning_effort
-        self.use_messages_endpoint = use_messages_endpoint
-        
-        # LLMOptionsProtocol compatibility
-        self.max_tokens = max_completion_tokens
+    temperature: Optional[float] = Field(default=0.0)
+    max_completion_tokens: Optional[int] = Field(default=None)
+    tools: Optional[list[ToolDefinition]] = Field(default=None)
+    tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = Field(default=None)
+    response_format: Optional[ResponseFormat] = Field(default=None)
+    reasoning_effort: Optional[str] = Field(default=None)
+    use_messages_endpoint: bool = Field(default=False)
+    max_tokens: Optional[int] = Field(default=None)  # LLMOptionsProtocol compatibility
+    
+    def model_post_init(self, __context: Any) -> None:
+        # LLMOptionsProtocol compatibility - sync max_tokens with max_completion_tokens
+        if self.max_completion_tokens is not None:
+            object.__setattr__(self, 'max_tokens', self.max_completion_tokens)
 
 
-class GrokMixin:
+class GrokMixin(LLMKeyModel):
     """Mixin class containing all Grok implementation."""
     
     can_stream: bool = True
     needs_key: Optional[str] = "grok"
     key_env_var: Optional[str] = "XAI_API_KEY"
-    Options = GrokOptions
+    
+    # Cast to the actual expected type from the LLM framework
+    Options = cast("type[llm.KeyModel.Options]", GrokOptions)
 
     def __init__(self, model_id: str) -> None:
+        super().__init__()
         self.model_id = model_id
         self._openai_formatter = OpenAIFormatHandler(model_id)
         self._anthropic_formatter = AnthropicFormatHandler(model_id)
@@ -149,10 +154,10 @@ class GrokMixin:
         self._tool_processor = ToolProcessor(model_id)
         self._stream_processor = StreamProcessor(model_id)
 
-    def get_key(self, key: Optional[str] = None) -> str:
+    def get_key(self, explicit_key: Optional[str] = None) -> Optional[str]:
         """Get API key for authentication."""
-        if key:
-            return key
+        if explicit_key:
+            return explicit_key
         import os
         api_key = os.environ.get(self.key_env_var or "XAI_API_KEY")
         if api_key is None:
@@ -272,11 +277,13 @@ class GrokMixin:
         stream: bool,
         response: llm.Response,
         conversation: Optional[llm.Conversation] = None,
-        **options: Any
+        key: Optional[str] = None
     ) -> Iterator[str]:
         """Execute model with given prompt and options."""
         try:
-            api_key = self.get_key()
+            api_key = self.get_key(key)
+            if api_key is None:
+                raise ValueError(f"API key not found. Set {self.key_env_var} environment variable")
             client = self._get_client(api_key)
             messages = self.build_messages(prompt, conversation)
             
@@ -287,21 +294,36 @@ class GrokMixin:
             }
             
             grok_options = GrokOptions()
-            # Extract options from kwargs dictionary
-            if 'temperature' in options:
-                grok_options.temperature = options['temperature']
-            if 'max_completion_tokens' in options:
-                grok_options.max_completion_tokens = options['max_completion_tokens']
-            if 'tools' in options:
-                grok_options.tools = options['tools']
-            if 'tool_choice' in options:
-                grok_options.tool_choice = options['tool_choice']
-            if 'response_format' in options:
-                grok_options.response_format = options['response_format']
-            if 'reasoning_effort' in options:
-                grok_options.reasoning_effort = options['reasoning_effort']
-            if 'use_messages_endpoint' in options:
-                grok_options.use_messages_endpoint = options['use_messages_endpoint']
+            # Extract options from prompt.options using getattr for type safety
+            options = prompt.options
+            if options:
+                temperature = getattr(options, 'temperature', None)
+                if temperature is not None:
+                    grok_options.temperature = temperature
+                
+                max_completion_tokens = getattr(options, 'max_completion_tokens', None)
+                if max_completion_tokens is not None:
+                    grok_options.max_completion_tokens = max_completion_tokens
+                
+                tools = getattr(options, 'tools', None)
+                if tools is not None:
+                    grok_options.tools = tools
+                
+                tool_choice = getattr(options, 'tool_choice', None)
+                if tool_choice is not None:
+                    grok_options.tool_choice = tool_choice
+                
+                response_format = getattr(options, 'response_format', None)
+                if response_format is not None:
+                    grok_options.response_format = response_format
+                
+                reasoning_effort = getattr(options, 'reasoning_effort', None)
+                if reasoning_effort is not None:
+                    grok_options.reasoning_effort = reasoning_effort
+                
+                use_messages_endpoint = getattr(options, 'use_messages_endpoint', None)
+                if use_messages_endpoint is not None:
+                    grok_options.use_messages_endpoint = use_messages_endpoint
 
             if grok_options.temperature is not None:
                 body["temperature"] = grok_options.temperature
@@ -348,14 +370,22 @@ class GrokMixin:
     ) -> Iterator[str]:
         """Handle streaming response from API."""
         try:
-            # Use the client's request method directly
-            with client.request(
-                method="POST",
-                url=endpoint_url,
-                json=body,
-                stream=True
-            ) as http_response:
-                for chunk_text in self._stream_processor.process_stream(http_response, response, options.use_messages_endpoint):
+            # Use the appropriate high-level client method for streaming
+            if options.use_messages_endpoint:
+                http_response = client.post_anthropic_messages(
+                    request_data=self._anthropic_formatter.build_anthropic_request(body),
+                    model=self.model_id,
+                    stream=True
+                )
+            else:
+                http_response = client.post_openai_completion(
+                    request_data=body,
+                    model=self.model_id,
+                    stream=True
+                )
+            
+            with http_response as response_stream:
+                for chunk_text in self._stream_processor.process_stream(response_stream, response, options.use_messages_endpoint):
                     if chunk_text:
                         yield chunk_text
         
@@ -373,13 +403,19 @@ class GrokMixin:
     ) -> Iterator[str]:
         """Handle non-streaming response from API."""
         try:
-            # Use the client's request method directly
-            http_response = client.request(
-                method="POST",
-                url=endpoint_url,
-                json=body,
-                stream=False
-            )
+            # Use the appropriate high-level client method for non-streaming
+            if options.use_messages_endpoint:
+                http_response = client.post_anthropic_messages(
+                    request_data=self._anthropic_formatter.build_anthropic_request(body),
+                    model=self.model_id,
+                    stream=False
+                )
+            else:
+                http_response = client.post_openai_completion(
+                    request_data=body,
+                    model=self.model_id,
+                    stream=False
+                )
             
             api_response = http_response.json()
             

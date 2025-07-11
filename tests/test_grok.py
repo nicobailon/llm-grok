@@ -18,6 +18,7 @@ from llm_grok import (
     ToolDefinition,
     Message,
 )
+from llm_grok.grok import GrokOptions
 from llm_grok.exceptions import AuthenticationError
 from llm.models import ToolCall
 from llm_grok.types import TextContent, ImageContent
@@ -303,7 +304,7 @@ def test_temperature_option(model: Grok, mock_response: Dict[str, object], httpx
         json=mock_response
     )
     
-    prompt = MockPrompt("Test", options=Grok.Options(temperature=0.5), model=cast(llm.Model, model))
+    prompt = MockPrompt("Test", options=GrokOptions(temperature=0.5), model=cast(llm.Model, model))
     response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     list(response)
     
@@ -322,7 +323,7 @@ def test_max_tokens_option(model: Grok, mock_response: Dict[str, object], httpx_
         json=mock_response
     )
     
-    prompt = MockPrompt("Test", options=Grok.Options(max_completion_tokens=100), model=cast(llm.Model, model))
+    prompt = MockPrompt("Test", options=GrokOptions(max_completion_tokens=100), model=cast(llm.Model, model))
     response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     list(response)
     
@@ -431,7 +432,7 @@ def test_function_calling_options() -> None:
     
     # Create prompt with tools
     tools = [cast(ToolDefinition, tool) for tool in SAMPLE_TOOLS.values()]
-    options = Grok.Options(
+    options = GrokOptions(
         tools=tools,
         tool_choice="auto"
     )
@@ -464,7 +465,7 @@ def test_function_calling_in_request_body(httpx_mock: HTTPXMock, mock_env: None)
     
     # Create prompt with tools
     tools = [cast(ToolDefinition, tool) for tool in SAMPLE_TOOLS.values()]
-    options = Grok.Options(
+    options = GrokOptions(
         tools=tools,
         tool_choice="auto"
     )
@@ -508,7 +509,7 @@ def test_streaming_tool_calls_accumulation(httpx_mock: HTTPXMock, mock_env: None
     )
     
     tools = [cast(ToolDefinition, tool) for tool in SAMPLE_TOOLS.values()]
-    options = Grok.Options(tools=tools)
+    options = GrokOptions(tools=tools)
     prompt = MockPrompt("Get weather", options=options, model=cast(llm.Model, grok))
     response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=True)
     
@@ -530,7 +531,7 @@ def test_streaming_tool_calls_accumulation(httpx_mock: HTTPXMock, mock_env: None
 
 def test_messages_endpoint_option_default() -> None:
     """Test that use_messages_endpoint defaults to False."""
-    options = Grok.Options()
+    options = GrokOptions()
     assert options.use_messages_endpoint is False
 
 
@@ -595,7 +596,7 @@ def test_messages_endpoint_request_format(httpx_mock: HTTPXMock) -> None:
     )
     
     # Create options separately and pass to prompt
-    options = Grok.Options(use_messages_endpoint=True)
+    options = GrokOptions(use_messages_endpoint=True)
     prompt = MockPrompt("Hello", options=options, model=cast(llm.Model, grok))
     
     response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=False)
@@ -626,7 +627,7 @@ def test_messages_endpoint_streaming(httpx_mock: HTTPXMock) -> None:
     )
     
     # Create options separately and pass to prompt  
-    options = Grok.Options(use_messages_endpoint=True)
+    options = GrokOptions(use_messages_endpoint=True)
     prompt = MockPrompt("Test", options=options, model=cast(llm.Model, grok))
     
     response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=True)
