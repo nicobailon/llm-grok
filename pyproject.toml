@@ -1,6 +1,6 @@
 [project]
-name = "llm-grok"
-version = "2.1.0"
+name = "llm-grok-plugin"
+version = "1.0.0"
 description = "LLM plugin providing access to Grok models using the xAI API"
 readme = "README.md"
 authors = [{name = "Benedikt Hiepler"}]
@@ -28,6 +28,10 @@ grok = "llm_grok"
 [project.optional-dependencies]
 test = ["pytest", "pytest-httpx"]
 dev = ["mypy", "black", "ruff", "types-click"]
+
+[tool.setuptools.packages.find]
+include = ["llm_grok", "llm_grok.*"]
+exclude = ["examples", "examples.*", "tests", "tests.*", "docs"]
 
 [tool.mypy]
 python_version = "3.13"

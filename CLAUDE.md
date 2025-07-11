@@ -58,32 +58,43 @@ python -m twine upload dist/*
 
 ## Architecture
 
-The plugin provides two implementation approaches:
+## Architecture
 
-### 1. Consolidated Implementation (Recommended)
-**File**: `llm_grok/llm_grok.py` (~450 lines)
+The llm-grok plugin uses a modular architecture optimized for maintainability and enterprise use:
 
-A clean, single-file implementation containing:
-- Model registry with all Grok models
-- Simple HTTP client with retry logic
-- Main Grok class with all features
-- Plugin registration
-- CLI commands
+### **Core Structure**
+```
+llm_grok/
+├── grok.py              # Main model class and orchestration
+├── client.py            # Enterprise HTTP client  
+├── models.py            # Model registry and capabilities
+├── types.py             # Comprehensive type definitions
+├── exceptions.py        # Error handling hierarchy
+├── formats/             # API format converters
+│   ├── openai.py       # OpenAI format handling
+│   └── anthropic.py    # Anthropic format handling
+└── processors/          # Content processors
+    ├── multimodal.py   # Image processing
+    ├── streaming.py    # SSE stream handling
+    └── tools.py        # Function calling
+```
 
-This implementation is ideal for most users and includes all core functionality while being easy to understand and modify.
+### **Development Guidelines**
 
-### 2. Modular Implementation
-**Directory**: `llm_grok/` with multiple modules
+**Always use the modular implementation** for all development work:
+- Modify components in their specialized files
+- Add new processors for new content types  
+- Extend formatters for new API formats
+- Use the type system for safety
 
-An enterprise-grade architecture with:
-- `client.py`: HTTP client with circuit breakers and connection pooling
-- `exceptions.py`: Comprehensive exception hierarchy
-- `types.py`: Full TypedDict definitions
-- `formats/`: API format converters
-- `processors/`: Specialized content handlers
-- `models.py`: Model registry and utilities
+**Educational Reference**: The `examples/consolidated_plugin.py` provides a simplified view of the core logic but should not be used for production development.
 
-This implementation provides advanced features like SSRF protection, thread-safe resource management, and extensive error handling.
+### **Key Patterns**
+
+1. **Processor Pattern**: Specialized classes handle specific content types
+2. **Formatter Pattern**: Convert between different API formats
+3. **Type Safety**: Extensive TypedDict usage throughout
+4. **Enterprise Reliability**: Circuit breakers, retries, connection pooling
 
 ### Model Configuration
 
@@ -301,10 +312,10 @@ if "tool_calls" in delta:
 ## Implementation Choice
 
 When working on this codebase:
-- **Use the consolidated implementation** (`llm_grok.py`) for most development work
-- The modular implementation exists for backwards compatibility and enterprise needs
-- Both implementations provide identical functionality to end users
-- The consolidated version is easier to understand, debug, and modify
+- **Use the modular implementation** (`llm_grok/` package) for all development work
+- The educational implementation exists in `examples/` for learning purposes only
+- Focus on the production modular architecture for all changes
+- The examples provide simplified reference implementations for understanding core concepts
 
 
 

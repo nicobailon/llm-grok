@@ -171,21 +171,23 @@ The messages endpoint provides better handling of:
 
 ## Architecture
 
-The plugin provides two implementation approaches:
+The llm-grok plugin uses a clean, modular architecture optimized for reliability and maintainability:
 
-### Consolidated Implementation (Recommended for most users)
-- **Single file**: `llm_grok.py` contains the entire implementation (~450 lines)
-- **Simple and maintainable**: All functionality in one place
-- **Full feature support**: Images, streaming, function calling, all models
-- **Minimal dependencies**: Only requires httpx, llm, and pydantic
+### 🏗️ **Component-Based Design**
+- **Processors**: Handle content transformation (multimodal, streaming, tools)
+- **Formatters**: Convert between API formats (OpenAI ↔ Anthropic)  
+- **Client**: Enterprise HTTP client with retry logic and connection pooling
+- **Models**: Centralized model capability registry
 
-### Modular Implementation (For advanced use cases)
-- **Multiple modules**: Separated into client, processors, format handlers, etc.
-- **Enterprise features**: Circuit breakers, connection pooling, SSRF protection
-- **Extensible**: Easy to add new processors or format handlers
-- **Complex type system**: Comprehensive TypedDict definitions
+### 🎓 **Learning Resources**
+For understanding the core concepts, see the simplified reference implementation at `examples/consolidated_plugin.py` (~500 lines).
 
-For details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+### 🔧 **Enterprise Features**
+- Thread-safe shared resource management
+- Circuit breakers and connection pooling
+- Comprehensive error handling hierarchy
+- SSRF protection and security measures
+- Type-safe API with full TypedDict coverage
 
 ## Development
 

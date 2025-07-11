@@ -1,4 +1,13 @@
 """
+LLM-Grok Consolidated Implementation - Educational Version
+
+This file provides a complete, single-file implementation of the llm-grok
+plugin for educational and reference purposes. For production use, prefer
+the modular implementation in the main llm_grok package.
+
+Features: All core functionality in ~500 lines
+Limitations: Simplified error handling and no enterprise features
+
 llm-grok plugin for xAI's Grok models.
 
 A clean, efficient implementation that provides access to all Grok models
@@ -15,47 +24,54 @@ import httpx
 import llm
 from pydantic import Field
 
+try:
+    from llm_grok.models import AVAILABLE_MODELS as MODELS, DEFAULT_MODEL
+except ImportError:
+    # Fallback for when used as standalone educational example
+    pass
+
 # ============================================================================
-# Model Registry
+# Model Registry - Educational Fallback
 # ============================================================================
 
-MODELS = {
-    # Grok 4 models
-    "x-ai/grok-4": {
-        "context_window": 256000,
-        "supports_vision": True,
-        "supports_tools": True,
-    },
-    "grok-4-heavy": {
-        "context_window": 256000,
-        "supports_vision": True,
-        "supports_tools": True,
-    },
-    # Grok 3 models
-    "grok-3-latest": {
-        "context_window": 128000,
-        "supports_vision": False,
-        "supports_tools": False,
-    },
-    "grok-3-fast-latest": {
-        "context_window": 128000,
-        "supports_vision": False,
-        "supports_tools": False,
-    },
-    # Grok 2 models
-    "grok-2-latest": {
-        "context_window": 32768,
-        "supports_vision": False,
-        "supports_tools": False,
-    },
-    "grok-2-vision-latest": {
-        "context_window": 32768,
-        "supports_vision": True,
-        "supports_tools": False,
-    },
-}
-
-DEFAULT_MODEL = "x-ai/grok-4"
+# For educational/standalone use when models module is not available
+if 'MODELS' not in locals():
+    MODELS = {
+        # Grok 4 models
+        "x-ai/grok-4": {
+            "context_window": 256000,
+            "supports_vision": True,
+            "supports_tools": True,
+        },
+        "grok-4-heavy": {
+            "context_window": 256000,
+            "supports_vision": True,
+            "supports_tools": True,
+        },
+        # Grok 3 models
+        "grok-3-latest": {
+            "context_window": 128000,
+            "supports_vision": False,
+            "supports_tools": False,
+        },
+        "grok-3-fast-latest": {
+            "context_window": 128000,
+            "supports_vision": False,
+            "supports_tools": False,
+        },
+        # Grok 2 models
+        "grok-2-latest": {
+            "context_window": 32768,
+            "supports_vision": False,
+            "supports_tools": False,
+        },
+        "grok-2-vision-latest": {
+            "context_window": 32768,
+            "supports_vision": True,
+            "supports_tools": False,
+        },
+    }
+    DEFAULT_MODEL = "x-ai/grok-4"
 
 
 # ============================================================================
@@ -421,12 +437,16 @@ class Grok(llm.KeyModel):
 
 
 # ============================================================================
-# Plugin Registration
+# Plugin Registration - Educational Version
 # ============================================================================
 
-@llm.hookimpl
-def register_models(register) -> None:
-    """Register Grok models with LLM."""
+# NOTE: This is an educational implementation. For production use, the
+# plugin registration is handled by the main llm_grok package.
+# These functions are commented out to prevent conflicts when used as an example.
+
+# @llm.hookimpl
+def register_models_educational(register) -> None:
+    """Register Grok models with LLM - Educational version."""
     # Register all models
     for model_id in MODELS:
         register(Grok(model_id))
@@ -438,12 +458,12 @@ def register_models(register) -> None:
 
 
 # ============================================================================
-# CLI Commands
+# CLI Commands - Educational Version
 # ============================================================================
 
-@llm.hookimpl
-def register_commands(cli) -> None:
-    """Register CLI commands."""
+# @llm.hookimpl
+def register_commands_educational(cli) -> None:
+    """Register CLI commands - Educational version."""
     import click
 
     @cli.group()
@@ -468,5 +488,5 @@ def register_commands(cli) -> None:
 # ============================================================================
 
 # For backwards compatibility with existing imports
-__version__ = "2.1.0"
+__version__ = "3.0.0"
 __all__ = ["Grok", "register_models", "register_commands"]
