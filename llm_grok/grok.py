@@ -3,6 +3,7 @@ import sys
 import threading
 from collections.abc import Iterator
 from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, TypeGuard, Dict, Any, ClassVar
+from contextlib import AbstractContextManager
 
 import httpx
 import llm
@@ -41,6 +42,7 @@ from .formats import AnthropicFormatHandler, OpenAIFormatHandler
 from .models import MODEL_INFO, get_model_info_safe
 from .processors import ImageProcessor, StreamProcessor, ToolProcessor
 from .types import (
+    AnthropicRequest,
     AnthropicToolChoice,
     AnthropicToolDefinition,
     ImageContent,
@@ -242,6 +244,13 @@ class GrokMixin(LLMKeyModel):
         """Build message array for API request."""
         messages: list[Message] = []
         
+        # Add system message if present
+        if hasattr(prompt, 'system') and prompt.system:
+            messages.append({
+                "role": "system",
+                "content": prompt.system
+            })
+        
         if conversation:
             for prev_response in conversation.responses:
                 messages.append({
@@ -372,20 +381,38 @@ class GrokMixin(LLMKeyModel):
         try:
             # Use the appropriate high-level client method for streaming
             if options.use_messages_endpoint:
+                # Convert to Anthropic format and pass as request_data
+                anthropic_request_dict = self._anthropic_formatter.convert_from_openai(body)
+                anthropic_request = cast(AnthropicRequest, anthropic_request_dict)
                 http_response = client.post_anthropic_messages(
-                    request_data=self._anthropic_formatter.build_anthropic_request(body),
+                    request_data=anthropic_request,
                     model=self.model_id,
                     stream=True
                 )
             else:
+                # Extract messages for OpenAI endpoint
+                messages = body.get("messages", [])
                 http_response = client.post_openai_completion(
-                    request_data=body,
+                    messages=messages,
                     model=self.model_id,
-                    stream=True
+                    stream=True,
+                    temperature=body.get("temperature", 0.7),
+                    max_completion_tokens=body.get("max_tokens"),
+                    tools=body.get("tools"),
+                    tool_choice=body.get("tool_choice"),
+                    response_format=body.get("response_format"),
+                    reasoning_effort=body.get("reasoning_effort")
                 )
             
-            with http_response as response_stream:
-                for chunk_text in self._stream_processor.process_stream(response_stream, response, options.use_messages_endpoint):
+            # Type narrowing: streaming responses are context managers
+            if isinstance(http_response, AbstractContextManager):
+                with http_response as response_stream:
+                    for chunk_text in self._stream_processor.process_stream(response_stream, response, options.use_messages_endpoint):
+                        if chunk_text:
+                            yield chunk_text
+            else:
+                # Fallback for non-context manager responses
+                for chunk_text in self._stream_processor.process_stream(http_response, response, options.use_messages_endpoint):
                     if chunk_text:
                         yield chunk_text
         
@@ -405,19 +432,34 @@ class GrokMixin(LLMKeyModel):
         try:
             # Use the appropriate high-level client method for non-streaming
             if options.use_messages_endpoint:
+                # Convert to Anthropic format and pass as request_data
+                anthropic_request_dict = self._anthropic_formatter.convert_from_openai(body)
+                anthropic_request = cast(AnthropicRequest, anthropic_request_dict)
                 http_response = client.post_anthropic_messages(
-                    request_data=self._anthropic_formatter.build_anthropic_request(body),
+                    request_data=anthropic_request,
                     model=self.model_id,
                     stream=False
                 )
             else:
+                # Extract messages for OpenAI endpoint
+                messages = body.get("messages", [])
                 http_response = client.post_openai_completion(
-                    request_data=body,
+                    messages=messages,
                     model=self.model_id,
-                    stream=False
+                    stream=False,
+                    temperature=body.get("temperature", 0.7),
+                    max_completion_tokens=body.get("max_tokens"),
+                    tools=body.get("tools"),
+                    tool_choice=body.get("tool_choice"),
+                    response_format=body.get("response_format"),
+                    reasoning_effort=body.get("reasoning_effort")
                 )
             
-            api_response = http_response.json()
+            # Type narrowing: non-streaming responses have json() method
+            if hasattr(http_response, 'json'):
+                api_response = http_response.json()
+            else:
+                raise ValueError("Invalid response type from client")
             
             # Extract content based on format
             if options.use_messages_endpoint:
