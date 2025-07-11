@@ -169,6 +169,24 @@ The messages endpoint provides better handling of:
 - Complex tool interactions
 - Streaming with detailed event types
 
+## Architecture
+
+The plugin provides two implementation approaches:
+
+### Consolidated Implementation (Recommended for most users)
+- **Single file**: `llm_grok.py` contains the entire implementation (~450 lines)
+- **Simple and maintainable**: All functionality in one place
+- **Full feature support**: Images, streaming, function calling, all models
+- **Minimal dependencies**: Only requires httpx, llm, and pydantic
+
+### Modular Implementation (For advanced use cases)
+- **Multiple modules**: Separated into client, processors, format handlers, etc.
+- **Enterprise features**: Circuit breakers, connection pooling, SSRF protection
+- **Extensible**: Easy to add new processors or format handlers
+- **Complex type system**: Comprehensive TypedDict definitions
+
+For details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Development
 
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:
@@ -189,7 +207,32 @@ pip install -e '.[test]'
 To run the tests:
 
 ```bash
+# Run all tests (using pytest - our only test framework)
 pytest
+
+# Run with coverage
+pytest --cov=llm_grok
+
+# Type checking (generates .mypy_cache/)
+mypy llm_grok --strict
+
+# Linting and formatting (generates .ruff_cache/)
+ruff check llm_grok/
+ruff format llm_grok/
+```
+
+### Development Tools
+
+This project uses the following development tools:
+
+- **pytest**: Test framework (cache: `.pytest_cache/`)
+- **mypy**: Static type checker (cache: `.mypy_cache/`)  
+- **ruff**: Fast linter and formatter (cache: `.ruff_cache/`)
+
+All cache directories are automatically regenerated and are ignored by git. You can safely delete them anytime:
+
+```bash
+rm -rf .pytest_cache .mypy_cache .ruff_cache
 ```
 
 ## Available Commands
@@ -199,10 +242,81 @@ List available Grok models:
 llm grok models
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+**Authentication Error**
+```
+Error: Invalid API key
+```
+Solution: Ensure your API key is correctly set:
+```bash
+llm keys set grok
+# Or use environment variable:
+export XAI_API_KEY="your-key-here"
+```
+
+**Rate Limiting**
+```
+Error: Rate limit exceeded
+```
+The plugin automatically retries with exponential backoff. For persistent issues:
+- Check your usage at https://console.x.ai
+- Consider using a model with higher rate limits
+- Reduce request frequency
+
+**Image Analysis Fails**
+```
+Warning: Skipping invalid image
+```
+Ensure:
+- Image format is JPEG, PNG, GIF, or WebP
+- URLs are publicly accessible
+- Base64 data is properly encoded
+- File size is under 10MB
+
+**Connection Issues**
+```
+Error: Network error
+```
+The plugin automatically retries failed requests up to 3 times. If issues persist:
+- Check your network connection
+- Verify firewall settings allow access to api.x.ai
+- Try again after a few moments
+
+### Debug Mode
+
+Enable detailed logging:
+```bash
+# Set log level
+export LLM_LOG_LEVEL=DEBUG
+
+# Run with verbose output
+llm -m x-ai/grok-4 "test" -v
+```
+
 ## API Documentation
 
 This plugin uses the xAI API. For more information about the API, see:
 - [xAI API Documentation](https://docs.x.ai/docs/overview)
+
+## Technical Details
+
+### Rate Limiting
+
+The plugin handles rate limits automatically:
+- Retries up to 3 times with exponential backoff
+- Respects `Retry-After` headers from the API
+- Clear error messages when limits are exceeded
+
+### Image Support
+
+For vision-capable models (Grok 4, Grok 2 Vision):
+- Supports JPEG, PNG, GIF, and WebP formats
+- Handles URLs, local files, and base64-encoded data
+- Automatic MIME type detection
+- Images are converted to base64 data URLs when needed
 
 ## Contributing
 

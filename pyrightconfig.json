@@ -1,6 +1,6 @@
 {
     "include": [
-        "llm_grok.py",
+        "llm_grok/",
         "tests"
     ],
     "exclude": [
