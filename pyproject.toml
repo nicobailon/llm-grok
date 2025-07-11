@@ -7,12 +7,11 @@ authors = [
     {name = "Nico Bailon", email = "nico@bailon.org"},
     {name = "Benedikt Hiepler"}
 ]
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 keywords = ["llm", "grok", "xai", "plugin", "ai", "enhanced", "enterprise"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -45,6 +44,8 @@ grok-enhanced = "llm_grok"
 [project.optional-dependencies]
 test = ["pytest", "pytest-httpx", "pytest-cov"]
 dev = ["mypy", "black", "ruff", "types-click"]
+# Combined dependencies for CI/CD workflows
+all = ["pytest", "pytest-httpx", "pytest-cov", "mypy", "black", "ruff", "types-click"]
 
 [tool.setuptools.packages.find]
 include = ["llm_grok", "llm_grok.*"]

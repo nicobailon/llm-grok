@@ -5,6 +5,8 @@ from typing import Any, Optional, Protocol, Union, cast, runtime_checkable
 
 from typing_extensions import TypeGuard
 
+from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
+
 from ..types import (
     AnthropicResponse,
     OpenAIResponse,
@@ -12,7 +14,6 @@ from ..types import (
     ToolCall,
     ToolCallWithIndex,
 )
-from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
 
 
 @runtime_checkable

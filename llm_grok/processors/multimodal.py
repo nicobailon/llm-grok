@@ -1,7 +1,7 @@
 """Multimodal content processing."""
 import base64
 import logging
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
 
@@ -15,9 +15,9 @@ from ..types import ImageContent, TextContent
 logger = logging.getLogger(__name__)
 
 
-class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]]]):
+class ImageProcessor(ContentProcessor[Any, list[Union[TextContent, ImageContent]]]):
     """Handles image validation and format conversion.
-    
+
     Supports three image formats:
     1. HTTP/HTTPS URLs - validated and returned as-is
     2. Data URLs with base64 encoding - validated for proper format
@@ -34,15 +34,15 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
         """Get processor configuration."""
         return self._config
 
-    def process(self, content: Any) -> List[Union[TextContent, ImageContent]]:
+    def process(self, content: Any) -> list[Union[TextContent, ImageContent]]:
         """Process a prompt with optional image attachments.
-        
+
         Args:
             content: The prompt object containing text and potentially attachments
-            
+
         Returns:
             List of content items formatted for multimodal API requests
-            
+
         Raises:
             ValidationError: If required model is not vision-capable
         """
@@ -69,15 +69,15 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
         # Build multimodal content
         return self.build_multimodal_content(text, all_attachments)
 
-    def validate(self, content: List[Union[TextContent, ImageContent]]) -> bool:
+    def validate(self, content: list[Union[TextContent, ImageContent]]) -> bool:
         """Validate multimodal content structure and formats.
-        
+
         Args:
             content: List of content items to validate
-            
+
         Returns:
             True if all content is valid
-            
+
         Raises:
             ValidationError: If content is invalid
         """
@@ -128,18 +128,18 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
 
     def validate_image_format(self, data: str) -> str:
         """Validate and format image data for API consumption.
-        
+
         Accepts image data in three formats:
         1. HTTP/HTTPS URLs - validated for security and returned
         2. Data URLs with base64 encoding - validated and returned
         3. Raw base64 strings - MIME type detected and formatted as data URL
-        
+
         Args:
             data: The image data as URL, data URL, or base64 string
-            
+
         Returns:
             Properly formatted image URL or data URL
-            
+
         Raises:
             ValidationError: If the image data is invalid or cannot be processed
         """
@@ -162,17 +162,17 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
                 mime_type = self._detect_mime_type(decoded)
                 return f"data:{mime_type};base64,{data}"
             except Exception as e:
-                raise ValidationError(f"Invalid base64 image data: {str(e)}")
+                raise ValidationError(f"Invalid base64 image data: {str(e)}") from e
 
     def _validate_data_url(self, data_url: str) -> str:
         """Validate a data URL format.
-        
+
         Args:
             data_url: The data URL to validate
-            
+
         Returns:
             The validated data URL
-            
+
         Raises:
             ValidationError: If the data URL is invalid
         """
@@ -186,19 +186,19 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
             # Validate it's valid base64
             base64.b64decode(base64_part, validate=True)
         except Exception as e:
-            raise ValidationError(f"Invalid base64 in data URL: {str(e)}")
+            raise ValidationError(f"Invalid base64 in data URL: {str(e)}") from e
 
         return data_url
 
     def _detect_mime_type(self, data: bytes) -> str:
         """Detect MIME type from image data.
-        
+
         Args:
             data: The raw image bytes
-            
+
         Returns:
             The detected MIME type
-            
+
         Raises:
             ValidationError: If the image format is not supported
         """
@@ -220,17 +220,17 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
                 "(JPEG, PNG, GIF, or WebP)"
             )
 
-    def build_multimodal_content(self, text: str, attachments: List[Any]) -> List[Union[TextContent, ImageContent]]:
+    def build_multimodal_content(self, text: str, attachments: list[Any]) -> list[Union[TextContent, ImageContent]]:
         """Build content array for multimodal messages.
-        
+
         Args:
             text: The text content
             attachments: List of attachments (may include images)
-            
+
         Returns:
             List of content items (text and image_url objects)
         """
-        content: List[Union[TextContent, ImageContent]] = [
+        content: list[Union[TextContent, ImageContent]] = [
             {"type": "text", "text": text}
         ]
 
@@ -266,12 +266,12 @@ class ImageProcessor(ContentProcessor[Any, List[Union[TextContent, ImageContent]
 
         return content
 
-    def process_prompt_with_attachments(self, prompt: Any) -> List[Union[TextContent, ImageContent]]:
+    def process_prompt_with_attachments(self, prompt: Any) -> list[Union[TextContent, ImageContent]]:
         """Process a prompt that may contain image attachments.
-        
+
         Args:
             prompt: The prompt object potentially containing text and attachments
-            
+
         Returns:
             List of content items for multimodal messages
         """

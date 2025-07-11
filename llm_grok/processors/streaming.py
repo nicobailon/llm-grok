@@ -4,13 +4,14 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional
 
+from llm_grok.processors import ContentProcessor, ProcessorConfig
+
 from ..constants import (
     DEFAULT_ENCODING,
     FIRST_CHOICE_INDEX,
 )
 from ..formats import AnthropicFormatHandler, OpenAIFormatHandler
 from ..types import StreamEvent
-from llm_grok.processors import ContentProcessor, ProcessorConfig
 
 logger = logging.getLogger(__name__)
 
