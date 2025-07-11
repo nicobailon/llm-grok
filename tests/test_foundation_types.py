@@ -119,8 +119,9 @@ def test_http_protocol_interfaces() -> None:
     # HTTP Client Protocol
     client_hints = get_type_hints(HTTPClient)
     # Methods are not included in get_type_hints for protocols
-    # but we can verify the protocol exists
-    assert hasattr(HTTPClient, "__protocol__")
+    # but we can verify the protocol exists by checking it's a Protocol subclass
+    from typing import _ProtocolMeta
+    assert isinstance(HTTPClient, _ProtocolMeta)
 
 
 def test_model_info_type_guard() -> None:

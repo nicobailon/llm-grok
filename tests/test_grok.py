@@ -585,7 +585,7 @@ def test_convert_to_anthropic_with_system() -> None:
     assert anthropic_format["messages"][0]["content"][0]["text"] == "Hello"
 
 
-def test_messages_endpoint_request_format(httpx_mock: HTTPXMock) -> None:
+def test_messages_endpoint_request_format(httpx_mock: HTTPXMock, mock_env) -> None:
     """Test that messages endpoint uses correct request format."""
     grok = Grok("x-ai/grok-4")
     
@@ -680,8 +680,9 @@ def test_json_cache_memory_monitoring() -> None:
     # Adding this should trigger cache clearing
     test_data_another: RequestBody = {"model": "another", "messages": []}
     size3 = client._estimate_json_size(test_data_another)
-    assert client._cache_memory_usage < initial_memory  # Cache was cleared
+    # Cache should have been cleared and now only contains the new entry
     assert len(client._json_size_cache) == 1  # Only new entry remains
+    assert client._cache_memory_usage == size3  # Memory usage should equal size of new entry
     
     # Test cleanup
     client._cleanup_cache()

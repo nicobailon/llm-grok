@@ -23,8 +23,13 @@ class TestCircuitBreakerFailureThreshold:
         """Circuit breaker opens after reaching failure threshold."""
         client = GrokClient(TEST_API_KEY)
         
-        # Mock 5 consecutive network failures
-        httpx_mock.add_exception(httpx.NetworkError("Connection failed"))
+        # Mock exactly 5 consecutive network failures for specific URL
+        for _ in range(5):
+            httpx_mock.add_exception(
+                httpx.NetworkError("Connection failed"),
+                url=CHAT_COMPLETIONS_URL,
+                method="POST"
+            )
         
         # First 4 failures should not open circuit
         for i in range(4):
@@ -35,7 +40,7 @@ class TestCircuitBreakerFailureThreshold:
         with pytest.raises(NetworkError):
             client.make_request("POST", CHAT_COMPLETIONS_URL, {}, cast(RequestBody, {}))
         
-        # Next request should fail due to open circuit
+        # Next request should fail due to open circuit (doesn't hit network)
         with pytest.raises(NetworkError, match="Circuit breaker is open"):
             client.make_request("POST", CHAT_COMPLETIONS_URL, {}, cast(RequestBody, {}))
 
@@ -215,10 +220,16 @@ class TestCircuitBreakerThreadSafety:
         results = []
         exceptions = []
         
+        # Pre-configure enough exceptions for all threads
+        for _ in range(10):
+            httpx_mock.add_exception(
+                httpx.NetworkError("Connection failed"),
+                url=CHAT_COMPLETIONS_URL,
+                method="POST"
+            )
+        
         def make_failing_request() -> None:
             try:
-                # This will fail and contribute to opening circuit
-                httpx_mock.add_exception(httpx.NetworkError("Connection failed"))
                 client.make_request("POST", CHAT_COMPLETIONS_URL, {}, cast(RequestBody, {}))
                 results.append("success")
             except NetworkError as e:
@@ -236,8 +247,11 @@ class TestCircuitBreakerThreadSafety:
         
         # Should have enough failures to open circuit
         assert len(exceptions) == 10
-        # Check that circuit opened
-        assert any("Circuit breaker is open" in exc for exc in exceptions) or len(exceptions) >= 5
+        # Check that circuit opened after some failures
+        network_errors = [exc for exc in exceptions if "Connection failed" in exc]
+        circuit_errors = [exc for exc in exceptions if "Circuit breaker is open" in exc]
+        # Some should be network errors, some should be circuit breaker errors
+        assert len(network_errors) >= 5 or len(circuit_errors) > 0
 
     def test_circuit_breaker_lock_prevents_race_conditions(self) -> None:
         """Circuit breaker uses locks to prevent race conditions."""

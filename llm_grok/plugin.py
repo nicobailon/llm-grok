@@ -19,7 +19,7 @@ def register_models(register: RegisterFunction) -> None:
         register: The LLM model registration function
     """
     for model_id in AVAILABLE_MODELS:
-        register(model_id, Grok)
+        register(Grok(model_id))
 
 
 @llm.hookimpl
