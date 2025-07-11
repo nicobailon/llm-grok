@@ -2,7 +2,7 @@
 import base64
 import json
 import pytest
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 from unittest.mock import Mock
 
 from llm_grok.processors import ImageProcessor, ToolProcessor, StreamProcessor
@@ -158,6 +158,63 @@ class TestStreamProcessor:
     def processor(self) -> StreamProcessor:
         """Create a StreamProcessor instance."""
         return StreamProcessor("x-ai/grok-4")
+    
+    def test_buffer_overflow_protection(self, processor) -> None:
+        """Test buffer overflow protection."""
+        from llm_grok.client import GrokClient
+        
+        # Create content that exceeds buffer limit
+        large_content = "x" * (GrokClient.MAX_BUFFER_SIZE + 1000)
+        chunk = f'data: {{"choices":[{{"delta":{{"content":"{large_content}"}}}}]}}\n\n'.encode()
+        
+        events = list(processor.process([chunk]))
+        
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert "buffer exceeded" in events[0]["error"]
+    
+    def test_malformed_json_handling(self, processor) -> None:
+        """Test handling of malformed JSON in stream."""
+        chunks = [
+            b'data: {"choices":[{"delta":{"content":"valid"}}]}\n\n',  # Valid JSON
+            b'data: [DONE]\n\n'
+        ]
+        
+        events = list(processor.process(chunks))
+        
+        # Should process valid chunks
+        content_events = [e for e in events if e.get("type") == "content"]
+        done_events = [e for e in events if e.get("type") == "done"]
+        
+        assert len(content_events) >= 1
+        assert len(done_events) == 1
+    
+    def test_connection_interruption(self, processor) -> None:
+        """Test handling of connection interruption."""
+        def interrupted_stream() -> Iterator[bytes]:
+            yield b'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n'
+            yield b'data: {"choices":[{"delta":{"content":" world"}}]}\n\n'
+            raise ConnectionError("Stream interrupted")
+        
+        with pytest.raises(ConnectionError):
+            list(processor.process(interrupted_stream()))
+    
+    def test_process_stream_buffer_overflow(self, processor) -> None:
+        """Test process_stream method with buffer overflow."""
+        from llm_grok.client import GrokClient
+        from unittest.mock import Mock
+        
+        # Create mock HTTP response
+        large_content = "x" * (GrokClient.MAX_BUFFER_SIZE + 1000)
+        mock_response = Mock()
+        mock_response.iter_raw.return_value = [large_content.encode()]
+        
+        # Create mock LLM response
+        llm_response = Mock()
+        llm_response._tool_calls_accumulator = []
+        
+        with pytest.raises(ValueError, match="buffer exceeded"):
+            list(processor.process_stream(mock_response, llm_response, False))
     
     def test_process_stream_delta_content(self, processor) -> None:
         """Test processing stream delta with content."""
