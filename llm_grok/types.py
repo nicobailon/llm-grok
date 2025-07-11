@@ -360,18 +360,18 @@ class LLMModelProtocol(Protocol):
     def __init__(self, model_id: str) -> None: ...
 
 
-@runtime_checkable  
+@runtime_checkable
 class LLMOptionsProtocol(Protocol):
     """Protocol for LLM framework options."""
-    temperature: float | None
-    max_tokens: int | None
+    temperature: Optional[float]
+    max_tokens: Optional[int]
 
 
 @runtime_checkable
 class LLMPromptProtocol(Protocol):
     """Protocol for LLM framework prompt."""
-    prompt: str | list[Any]
-    attachments: list[Any] | None
+    prompt: Union[str, list[Any]]
+    attachments: Optional[list[Any]]
 
 
 class HTTPResponse(Protocol):
@@ -388,12 +388,12 @@ class HTTPClient(Protocol):
     """Protocol for HTTP client objects."""
     
     def post(
-        self, 
-        url: str, 
+        self,
+        url: str,
         *,
-        json: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        timeout: float | None = None
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = None
     ) -> HTTPResponse: ...
     
     def stream(
@@ -401,9 +401,9 @@ class HTTPClient(Protocol):
         method: str,
         url: str,
         *,
-        json: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        timeout: float | None = None
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = None
     ) -> AbstractContextManager[HTTPResponse]: ...
 
 
@@ -416,7 +416,7 @@ class RequestBody(TypedDict):
     max_completion_tokens: NotRequired[int]
     max_tokens: NotRequired[int]  # For Anthropic compatibility
     tools: NotRequired[list[ToolDefinition]]
-    tool_choice: NotRequired[Literal["auto", "none"] | ToolChoice]
+    tool_choice: NotRequired[Union[Literal["auto", "none"], ToolChoice]]
     response_format: NotRequired[ResponseFormat]
     reasoning_effort: NotRequired[str]
     stream: NotRequired[bool]

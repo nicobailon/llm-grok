@@ -4,7 +4,7 @@
 [![Tests](https://github.com/nicobailon/llm-grok/workflows/Test/badge.svg)](https://github.com/nicobailon/llm-grok/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/nicobailon/llm-grok/blob/main/LICENSE)
 
-Enhanced plugin for [LLM](https://llm.datasette.io/) providing advanced access to Grok models using the xAI API with enterprise-grade features and improved reliability.
+Enhanced plugin for [LLM](https://llm.datasette.io/) providing advanced access to Grok models using the xAI API.
 
 ## 🚀 Enhanced Features
 

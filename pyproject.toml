@@ -51,7 +51,7 @@ include = ["llm_grok", "llm_grok.*"]
 exclude = ["examples", "examples.*", "tests", "tests.*", "docs"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
