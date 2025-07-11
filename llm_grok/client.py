@@ -8,7 +8,8 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, ContextManager, Dict, Literal, Optional, Union, cast
+from typing import Any, Literal, Optional, Union, cast, TypeGuard
+from contextlib import AbstractContextManager
 
 import httpx
 from rich.console import Console
@@ -112,7 +113,7 @@ class GrokClient:
         self._half_open_requests = 0
 
         # JSON size estimation cache
-        self._json_size_cache: Dict[str, int] = {}
+        self._json_size_cache: dict[str, int] = {}
         self._cache_lock = threading.Lock()
         self.MAX_CACHE_SIZE = 100  # Limit cache size to prevent memory issues
 
@@ -133,7 +134,7 @@ class GrokClient:
             self._client_pool.close()
             self._is_closed = True
 
-    def _log_request(self, method: str, url: str, headers: Dict[str, str], body: RequestBody) -> None:
+    def _log_request(self, method: str, url: str, headers: dict[str, str], body: RequestBody) -> None:
         """Log outgoing request details."""
         if not self.enable_logging:
             return
@@ -147,15 +148,42 @@ class GrokClient:
             console.print(f"[dim]Messages: {len(body['messages'])} messages[/dim]")
         console.print(f"[dim]Model: {body.get('model', 'unknown')}[/dim]")
 
-    def _log_response(self, status_code: int, response_data: Optional[Union[OpenAIResponse, AnthropicResponse, Dict[str, str]]] = None) -> None:
+    def _is_openai_response(self, response: dict[str, Any]) -> TypeGuard[OpenAIResponse]:
+        """Type guard to check if response is OpenAI format."""
+        return (
+            "choices" in response 
+            and isinstance(response.get("choices"), list)
+            and "object" in response
+        )
+
+    def _is_anthropic_response(self, response: dict[str, Any]) -> TypeGuard[AnthropicResponse]:
+        """Type guard to check if response is Anthropic format."""
+        return (
+            "content" in response 
+            and isinstance(response.get("content"), list)
+            and response.get("type") == "message"
+        )
+
+    def _log_response(self, status_code: int, response_data: Optional[Union[OpenAIResponse, AnthropicResponse, dict[str, str]]] = None) -> None:
         """Log incoming response details."""
         if not self.enable_logging:
             return
 
         console.print(f"[green]← {status_code}[/green]")
-        if response_data:
-            if isinstance(response_data, dict) and "choices" in response_data:
-                console.print(f"[dim]Choices: {len(response_data['choices'])}[/dim]")
+        if response_data and isinstance(response_data, dict):
+            # Cast to dict[str, Any] for type guards
+            response_dict = dict(response_data)
+            if self._is_openai_response(response_dict):
+                console.print(f"[dim]Choices: {len(response_dict['choices'])}[/dim]")
+                if response_dict["choices"]:
+                    choice = response_dict["choices"][0]
+                    if "message" in choice:
+                        console.print(f"[dim]Role: {choice['message'].get('role', 'unknown')}[/dim]")
+            elif self._is_anthropic_response(response_dict):
+                console.print(f"[dim]Content blocks: {len(response_dict['content'])}[/dim]")
+                console.print(f"[dim]Role: {response_dict['role']}[/dim]")
+            else:
+                console.print("[dim]Unknown response format[/dim]")
 
     def _compute_cache_key(self, json_data: RequestBody) -> str:
         """Compute a cache key for JSON data.
@@ -303,7 +331,7 @@ class GrokClient:
 
     @contextmanager
     def _wrap_stream_with_circuit_breaker(
-        self, stream_cm: ContextManager[httpx.Response]
+        self, stream_cm: AbstractContextManager[httpx.Response]
     ) -> Iterator[httpx.Response]:
         """Wrap streaming context manager to track circuit breaker success/failure.
         
@@ -470,10 +498,10 @@ class GrokClient:
         self,
         method: str,
         url: str,
-        headers: Dict[str, str],
+        headers: dict[str, str],
         json_data: RequestBody,
         stream: bool = False,
-    ) -> Union[httpx.Response, ContextManager[httpx.Response]]:
+    ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Execute HTTP request with retry logic for rate limiting.
         
         Args:
@@ -562,9 +590,9 @@ class GrokClient:
         self,
         method: str,
         url: str,
-        headers: Dict[str, str],
-        json_data: Dict[str, Any],
-    ) -> ContextManager[httpx.Response]:
+        headers: dict[str, str],
+        json_data: RequestBody,
+    ) -> AbstractContextManager[httpx.Response]:
         """Execute streaming HTTP request with retry logic.
         
         This is a convenience method that wraps make_request with stream=True.
@@ -598,7 +626,7 @@ class GrokClient:
         response_format: Optional[ResponseFormat] = None,
         reasoning_effort: Optional[str] = None,
         stream_options: Optional[StreamOptions] = None,
-    ) -> Union[httpx.Response, ContextManager[httpx.Response]]:
+    ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Make a request to the OpenAI-compatible chat completions endpoint.
         
         Args:
@@ -658,7 +686,7 @@ class GrokClient:
         tools: Optional[list[AnthropicToolDefinition]] = None,
         tool_choice: Optional[Union[Literal["auto", "none"], AnthropicToolChoice]] = None,
         reasoning_effort: Optional[str] = None,
-    ) -> Union[httpx.Response, ContextManager[httpx.Response]]:
+    ) -> Union[httpx.Response, AbstractContextManager[httpx.Response]]:
         """Make a request to the Anthropic-compatible messages endpoint.
         
         Args:

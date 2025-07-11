@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Iterator
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Optional, Union, cast
 
 from llm_grok.constants import (
     FIRST_CHOICE_INDEX,
@@ -25,21 +25,21 @@ from .base import FormatHandler
 class AnthropicFormatHandler(FormatHandler):
     """Handles Anthropic format operations and conversions."""
 
-    def convert_messages_to_anthropic(self, openai_messages: List[Message]) -> AnthropicRequest:
+    def convert_messages_to_anthropic(self, openai_messages: list[Message]) -> AnthropicRequest:
         """Convert OpenAI messages to Anthropic format - not needed for Anthropic handler."""
         # This is handled by OpenAIFormatHandler
         raise NotImplementedError("Use OpenAIFormatHandler for OpenAI to Anthropic conversion")
 
-    def convert_tools_to_anthropic(self, openai_tools: List[ToolDefinition]) -> List[AnthropicToolDefinition]:
+    def convert_tools_to_anthropic(self, openai_tools: list[ToolDefinition]) -> list[AnthropicToolDefinition]:
         """Convert OpenAI tools to Anthropic format - not needed for Anthropic handler."""
         # This is handled by OpenAIFormatHandler
         raise NotImplementedError("Use OpenAIFormatHandler for tool conversion")
 
-    def parse_openai_sse(self, buffer: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    def parse_openai_sse(self, buffer: str) -> tuple[Optional[dict[str, Any]], str]:
         """Parse OpenAI SSE - not needed for Anthropic handler."""
         raise NotImplementedError("Use OpenAIFormatHandler for OpenAI SSE parsing")
 
-    def parse_anthropic_sse(self, buffer: str) -> Tuple[Optional[Tuple[str, Dict[str, Any]]], str]:
+    def parse_anthropic_sse(self, buffer: str) -> tuple[Optional[tuple[str, dict[str, Any]]], str]:
         """Parse Anthropic SSE format and return (event_type, event_data) tuple and remaining buffer."""
         if "\n\n" not in buffer:
             return None, buffer
@@ -64,12 +64,12 @@ class AnthropicFormatHandler(FormatHandler):
             return (event_type, event_data), remaining_buffer
         return None, remaining_buffer
 
-    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, Dict[str, Any]]]:
+    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, dict[str, Any]]]:
         """Parse SSE chunks - placeholder implementation."""
         # This would need a more complex implementation with buffer management
         yield {}
 
-    def convert_anthropic_stream_chunk(self, event_type: str, event_data: Dict[str, Any]) -> Optional[OpenAIStreamChunk]:
+    def convert_anthropic_stream_chunk(self, event_type: str, event_data: dict[str, Any]) -> Optional[OpenAIStreamChunk]:
         """Convert Anthropic streaming event to OpenAI format chunk."""
         if event_type == "message_start":
             # Start of message - no content yet
@@ -164,7 +164,7 @@ class AnthropicFormatHandler(FormatHandler):
 
         return None
 
-    def convert_from_openai(self, openai_request: Dict[str, Any]) -> Dict[str, Any]:
+    def convert_from_openai(self, openai_request: dict[str, Any]) -> dict[str, Any]:
         """Convert a full OpenAI request to Anthropic format.
         
         Args:
@@ -187,7 +187,7 @@ class AnthropicFormatHandler(FormatHandler):
                 conversation_messages.append(msg)
 
         # Build Anthropic request
-        anthropic_request: Dict[str, Any] = {
+        anthropic_request: dict[str, Any] = {
             "messages": []
         }
 
@@ -197,7 +197,7 @@ class AnthropicFormatHandler(FormatHandler):
 
         # Convert conversation messages
         for msg in conversation_messages:
-            anthropic_msg: Dict[str, Any] = {
+            anthropic_msg: dict[str, Any] = {
                 "role": msg["role"]
             }
 
@@ -276,7 +276,7 @@ class AnthropicFormatHandler(FormatHandler):
 
         return anthropic_request
 
-    def convert_from_anthropic_response(self, anthropic_response: Dict[str, Any]) -> OpenAIResponse:
+    def convert_from_anthropic_response(self, anthropic_response: dict[str, Any]) -> OpenAIResponse:
         """Convert Anthropic response to OpenAI format."""
         # Extract content from Anthropic response
         content_parts = anthropic_response.get("content", [])
@@ -301,7 +301,7 @@ class AnthropicFormatHandler(FormatHandler):
                 tool_calls.append(tool_call)
 
         # Build OpenAI-style response
-        message: Dict[str, Any] = {
+        message: dict[str, Any] = {
             "role": "assistant",
             "content": text_content if text_content else None
         }

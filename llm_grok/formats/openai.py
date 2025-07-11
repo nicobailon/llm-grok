@@ -3,7 +3,7 @@
 import json
 import warnings
 from collections.abc import Iterator
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Literal, Optional, Union, cast
 
 from llm_grok.constants import (
     FIRST_CHOICE_INDEX,
@@ -18,6 +18,7 @@ from llm_grok.types import (
     AnthropicMessage,
     AnthropicRequest,
     AnthropicTextBlock,
+    AnthropicToolChoice,
     AnthropicToolDefinition,
     AnthropicToolUse,
     ImageContent,
@@ -26,6 +27,7 @@ from llm_grok.types import (
     OpenAIStreamChunk,
     TextContent,
     ToolCall,
+    ToolChoice,
     ToolDefinition,
 )
 
@@ -35,7 +37,7 @@ from .base import FormatHandler
 class OpenAIFormatHandler(FormatHandler):
     """Handles OpenAI format operations and conversions."""
 
-    def parse_sse(self, buffer: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    def parse_sse(self, buffer: str) -> tuple[Optional[dict[str, Any]], str]:
         """Parse OpenAI SSE format and return parsed data and remaining buffer."""
         if "\n\n" not in buffer:
             return None, buffer
@@ -51,7 +53,7 @@ class OpenAIFormatHandler(FormatHandler):
                 pass
         return None, remaining_buffer
 
-    def parse_openai_sse(self, buffer: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    def parse_openai_sse(self, buffer: str) -> tuple[Optional[dict[str, Any]], str]:
         """Alias for parse_sse for compatibility.
         
         .. deprecated:: 3.0
@@ -65,7 +67,7 @@ class OpenAIFormatHandler(FormatHandler):
         )
         return self.parse_sse(buffer)
 
-    def convert_messages_to_anthropic(self, openai_messages: List[Message]) -> AnthropicRequest:
+    def convert_messages_to_anthropic(self, openai_messages: list[Message]) -> AnthropicRequest:
         """Convert OpenAI-style messages to Anthropic format.
         
         Args:
@@ -83,7 +85,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return result
 
-    def _extract_system_prompts(self, messages: List[Message]) -> List[str]:
+    def _extract_system_prompts(self, messages: list[Message]) -> list[str]:
         """Extract and combine system messages from OpenAI messages.
         
         Args:
@@ -107,7 +109,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return system_prompts
 
-    def _convert_user_assistant_messages(self, messages: List[Message]) -> List[AnthropicMessage]:
+    def _convert_user_assistant_messages(self, messages: list[Message]) -> list[AnthropicMessage]:
         """Convert user and assistant messages to Anthropic format.
         
         Args:
@@ -151,7 +153,7 @@ class OpenAIFormatHandler(FormatHandler):
             # Multimodal content
             converted_content = self._convert_multimodal_content(content)
             # Need to cast because we're initially creating with empty list
-            anthropic_msg["content"] = cast(List[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]], converted_content)
+            anthropic_msg["content"] = cast(list[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]], converted_content)
 
         # Handle tool calls in assistant messages
         if role == "assistant" and "tool_calls" in msg and msg["tool_calls"]:
@@ -161,7 +163,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return anthropic_msg
 
-    def _convert_multimodal_content(self, content: List[Union[TextContent, ImageContent]]) -> List[Union[AnthropicTextBlock, AnthropicImage]]:
+    def _convert_multimodal_content(self, content: list[Union[TextContent, ImageContent]]) -> list[Union[AnthropicTextBlock, AnthropicImage]]:
         """Convert multimodal content to Anthropic format.
         
         Args:
@@ -170,7 +172,7 @@ class OpenAIFormatHandler(FormatHandler):
         Returns:
             List of Anthropic content blocks
         """
-        anthropic_content: List[Union[AnthropicTextBlock, AnthropicImage]] = []
+        anthropic_content: list[Union[AnthropicTextBlock, AnthropicImage]] = []
 
         for part in content:
             if part["type"] == "text":
@@ -228,7 +230,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return image_block
 
-    def _convert_tool_calls(self, tool_calls: List[ToolCall]) -> List[AnthropicToolUse]:
+    def _convert_tool_calls(self, tool_calls: list[ToolCall]) -> list[AnthropicToolUse]:
         """Convert OpenAI tool calls to Anthropic tool use format.
         
         Args:
@@ -237,10 +239,10 @@ class OpenAIFormatHandler(FormatHandler):
         Returns:
             List of Anthropic tool use blocks
         """
-        tool_uses: List[AnthropicToolUse] = []
+        tool_uses: list[AnthropicToolUse] = []
 
         for tool_call in tool_calls:
-            if tool_call.get("function"):
+            if "function" in tool_call and tool_call["function"]:
                 try:
                     arguments = json.loads(tool_call["function"].get("arguments", "{}"))
                 except json.JSONDecodeError:
@@ -248,7 +250,7 @@ class OpenAIFormatHandler(FormatHandler):
 
                 tool_use: AnthropicToolUse = {
                     "type": "tool_use",
-                    "id": tool_call.get("id", ""),
+                    "id": tool_call["id"],
                     "name": tool_call["function"]["name"],
                     "input": arguments
                 }
@@ -256,7 +258,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return tool_uses
 
-    def convert_tools_to_anthropic(self, openai_tools: List[ToolDefinition]) -> List[AnthropicToolDefinition]:
+    def convert_tools_to_anthropic(self, openai_tools: list[ToolDefinition]) -> list[AnthropicToolDefinition]:
         """Convert OpenAI tool definitions to Anthropic format.
         
         Args:
@@ -279,7 +281,28 @@ class OpenAIFormatHandler(FormatHandler):
 
         return anthropic_tools
 
-    def convert_from_anthropic_response(self, anthropic_response: Dict[str, Any]) -> OpenAIResponse:
+    def convert_tool_choice_to_anthropic(self, tool_choice: Union[Literal["auto", "none"], ToolChoice]) -> Optional[Union[Literal["auto"], AnthropicToolChoice]]:
+        """Convert OpenAI tool choice to Anthropic format.
+        
+        Args:
+            tool_choice: OpenAI tool choice specification
+            
+        Returns:
+            Anthropic tool choice or None
+        """
+        if tool_choice == "auto":
+            return "auto"
+        elif tool_choice == "none":
+            return None  # Anthropic doesn't send tool_choice for none
+        elif isinstance(tool_choice, dict) and "function" in tool_choice:
+            # Convert specific function choice
+            return {
+                "type": "tool",
+                "name": tool_choice["function"]["name"]
+            }
+        return None
+
+    def convert_from_anthropic_response(self, anthropic_response: dict[str, Any]) -> OpenAIResponse:
         """Convert Anthropic response to OpenAI format."""
         import time
 
@@ -317,7 +340,7 @@ class OpenAIFormatHandler(FormatHandler):
             message_content = content
             tool_calls = None
 
-        message: Dict[str, Any] = {
+        message: dict[str, Any] = {
             "role": "assistant",
             "content": message_content
         }
@@ -332,7 +355,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return cast(OpenAIResponse, openai_response)
 
-    def parse_anthropic_sse(self, buffer: str) -> Tuple[Optional[Tuple[str, Dict[str, Any]]], str]:
+    def parse_anthropic_sse(self, buffer: str) -> tuple[Optional[tuple[str, dict[str, Any]]], str]:
         """Parse Anthropic SSE format and return event data and remaining buffer."""
         if "\n\n" not in buffer:
             return None, buffer
@@ -357,7 +380,7 @@ class OpenAIFormatHandler(FormatHandler):
             return (event_type, event_data), remaining_buffer
         return None, remaining_buffer
 
-    def convert_anthropic_stream_chunk(self, event_type: str, event_data: Dict[str, Any]) -> Optional[OpenAIStreamChunk]:
+    def convert_anthropic_stream_chunk(self, event_type: str, event_data: dict[str, Any]) -> Optional[OpenAIStreamChunk]:
         """Convert Anthropic streaming event to OpenAI format chunk."""
         import time
 
@@ -458,7 +481,7 @@ class OpenAIFormatHandler(FormatHandler):
 
         return None
 
-    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, Dict[str, Any]]]:
+    def parse_sse_chunk(self, chunk: bytes) -> Iterator[Union[OpenAIStreamChunk, dict[str, Any]]]:
         """Parse Server-Sent Events chunks from either API format.
         
         This implementation focuses on OpenAI format parsing.
@@ -473,7 +496,7 @@ class OpenAIFormatHandler(FormatHandler):
             else:
                 break
 
-    def _convert_usage(self, anthropic_usage: Dict[str, Any]) -> Dict[str, int]:
+    def _convert_usage(self, anthropic_usage: dict[str, Any]) -> dict[str, int]:
         """Convert Anthropic usage to OpenAI format."""
         input_tokens = anthropic_usage.get("input_tokens", 0)
         output_tokens = anthropic_usage.get("output_tokens", 0)
@@ -483,7 +506,7 @@ class OpenAIFormatHandler(FormatHandler):
             "total_tokens": input_tokens + output_tokens
         }
 
-    def convert_from_anthropic(self, anthropic_data: Dict[str, Any]) -> Dict[str, Any]:
+    def convert_from_anthropic(self, anthropic_data: dict[str, Any]) -> dict[str, Any]:
         """Convert Anthropic format data to OpenAI format.
         
         Args:
@@ -492,7 +515,7 @@ class OpenAIFormatHandler(FormatHandler):
         Returns:
             OpenAI-format request data
         """
-        result: Dict[str, Any] = {"messages": []}
+        result: dict[str, Any] = {"messages": []}
 
         # Convert system message if present
         if "system" in anthropic_data and anthropic_data["system"]:
@@ -549,10 +572,8 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_anthropic_message_to_openai(self, msg: AnthropicMessage) -> Message:
         """Convert a single Anthropic message to OpenAI format."""
-        openai_msg: Message = {"role": msg["role"]}
-
         if isinstance(msg["content"], str):
-            openai_msg["content"] = msg["content"]
+            openai_msg: Message = {"role": msg["role"], "content": msg["content"]}
         elif isinstance(msg["content"], list):
             # Handle multimodal content
             content = self._convert_anthropic_content_to_openai(msg["content"])
@@ -563,30 +584,37 @@ class OpenAIFormatHandler(FormatHandler):
                 # Set content to text parts only
                 text_parts = [part for part in msg["content"] if part.get("type") != "tool_use"]
                 if text_parts:
-                    openai_msg["content"] = self._convert_anthropic_content_to_openai(text_parts)
+                    content_value = self._convert_anthropic_content_to_openai(text_parts)
                 else:
-                    openai_msg["content"] = ""
+                    content_value = ""
 
-                # Add tool calls
-                openai_msg["tool_calls"] = [
-                    {
-                        "id": tool_use["id"],
-                        "type": "function",
-                        "function": {
-                            "name": tool_use["name"],
-                            "arguments": json.dumps(tool_use.get("input", {}))
+                # Create message with tool calls
+                openai_msg: Message = {
+                    "role": msg["role"],
+                    "content": content_value,
+                    "tool_calls": [
+                        {
+                            "id": tool_use["id"],
+                            "type": "function",
+                            "function": {
+                                "name": tool_use["name"],
+                                "arguments": json.dumps(tool_use.get("input", {}))
+                            }
                         }
-                    }
-                    for tool_use in tool_uses
-                ]
+                        for tool_use in tool_uses
+                    ]
+                }
             else:
-                openai_msg["content"] = content
+                openai_msg: Message = {"role": msg["role"], "content": content}
+        else:
+            # Fallback for unexpected content types
+            openai_msg: Message = {"role": msg["role"], "content": ""}
 
         return openai_msg
 
     def _convert_anthropic_content_to_openai(
-        self, content: List[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]]
-    ) -> Union[str, List[Union[TextContent, ImageContent]]]:
+        self, content: list[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]]
+    ) -> Union[str, list[Union[TextContent, ImageContent]]]:
         """Convert Anthropic content blocks to OpenAI format."""
         # Filter out tool_use blocks which are handled separately
         filtered_content = [part for part in content if part.get("type") != "tool_use"]
@@ -597,7 +625,7 @@ class OpenAIFormatHandler(FormatHandler):
             return "".join(cast(AnthropicTextBlock, part)["text"] for part in text_parts)
 
         # Otherwise, return multimodal array
-        openai_content: List[Union[TextContent, ImageContent]] = []
+        openai_content: list[Union[TextContent, ImageContent]] = []
         for part in filtered_content:
             if part.get("type") == "text":
                 text_part = cast(AnthropicTextBlock, part)
@@ -631,9 +659,9 @@ class OpenAIFormatHandler(FormatHandler):
 
         return openai_content
 
-    def _convert_anthropic_tools_to_openai(self, anthropic_tools: List[AnthropicToolDefinition]) -> List[ToolDefinition]:
+    def _convert_anthropic_tools_to_openai(self, anthropic_tools: list[AnthropicToolDefinition]) -> list[ToolDefinition]:
         """Convert Anthropic tool definitions to OpenAI format."""
-        openai_tools: List[ToolDefinition] = []
+        openai_tools: list[ToolDefinition] = []
 
         for tool in anthropic_tools:
             # Support both direct tool format and wrapped format

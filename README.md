@@ -180,7 +180,7 @@ The llm-grok plugin uses a clean, modular architecture optimized for reliability
 - **Models**: Centralized model capability registry
 
 ### 🎓 **Learning Resources**
-For understanding the core concepts, see the simplified reference implementation at `examples/consolidated_plugin.py` (~500 lines).
+For understanding the core concepts, refer to the modular architecture documentation in `ARCHITECTURE.md`.
 
 ### 🔧 **Enterprise Features**
 - Thread-safe shared resource management

@@ -2,7 +2,7 @@
 import sys
 import threading
 from collections.abc import Iterator
-from typing import Any, List, Literal, Optional, Union, cast
+from typing import Any, Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, TypeGuard
 
 import httpx
 import llm
@@ -10,6 +10,34 @@ from pydantic import Field
 from rich import print as rprint
 from rich.console import Console
 from rich.panel import Panel
+
+if TYPE_CHECKING:
+    try:
+        from llm import KeyModel as LLMBaseModel
+    except ImportError:
+        # Create a protocol for type checking
+        @runtime_checkable
+        class LLMBaseModel(Protocol):
+            model_id: str
+            can_stream: bool
+            needs_key: Optional[str]
+            key_env_var: Optional[str]
+            
+            def execute(self, prompt: Any, stream: bool, response: Any, conversation: Any, key: str | None) -> Iterator[str]: ...
+else:
+    # Runtime - use the proper base class for API-key models
+    try:
+        from llm import KeyModel as LLMBaseModel
+    except ImportError:
+        # Fallback to protocol class if LLM not available
+        @runtime_checkable
+        class LLMBaseModel(Protocol):
+            model_id: str
+            can_stream: bool
+            needs_key: Optional[str]
+            key_env_var: Optional[str]
+            
+            def execute(self, prompt: Any, stream: bool, response: Any, conversation: Any, key: str | None) -> Iterator[str]: ...
 
 from .client import GrokClient
 from .exceptions import (
@@ -21,10 +49,15 @@ from .exceptions import (
     RateLimitError,
 )
 from .formats import AnthropicFormatHandler, OpenAIFormatHandler
-from .models import MODEL_INFO
+from .models import MODEL_INFO, get_model_info_safe
 from .processors import ImageProcessor, StreamProcessor, ToolProcessor
 from .types import (
+    AnthropicToolChoice,
+    AnthropicToolDefinition,
     ImageContent,
+    LLMModelProtocol,
+    LLMOptionsProtocol,
+    LLMPromptProtocol,
     Message,
     RequestBody,
     ResponseFormat,
@@ -32,6 +65,18 @@ from .types import (
     ToolChoice,
     ToolDefinition,
 )
+
+
+@runtime_checkable
+class ResponseProtocol(Protocol):
+    """Protocol for LLM response objects."""
+    def text(self) -> str: ...
+    
+    
+def is_response_like(obj: Any) -> TypeGuard[ResponseProtocol]:
+    """Type guard for response-like objects."""
+    return hasattr(obj, 'text') and callable(getattr(obj, 'text'))
+
 
 console = Console()
 
@@ -41,56 +86,81 @@ _client_lock = threading.Lock()
 _current_api_key: Optional[str] = None
 
 
-class Grok(llm.KeyModel):
-    """Grok model implementation for LLM CLI."""
+if TYPE_CHECKING:
+    try:
+        from llm import Options as LLMOptionsBase
+    except ImportError:
+        # Protocol for type checking
+        class LLMOptionsBase(Protocol):
+            pass
+else:
+    try:
+        from llm import Options as LLMOptionsBase
+    except ImportError:
+        # Protocol for runtime if LLM not available
+        class LLMOptionsBase(Protocol):
+            pass
 
-    can_stream = True
-    needs_key = "grok"
-    key_env_var = "XAI_API_KEY"
 
-    class Options(llm.Options):  # type: ignore[assignment]
-        temperature: Optional[float] = Field(
-            description=(
-                "Determines the sampling temperature. Higher values like 0.8 increase randomness, "
-                "while lower values like 0.2 make the output more focused and deterministic."
-            ),
-            ge=0,
-            le=1,
-            default=0.0,
-        )
-        max_completion_tokens: Optional[int] = Field(
-            description="The maximum number of tokens to generate, including visible output tokens and reasoning tokens.",
-            ge=0,
-            default=None,
-        )
-        tools: Optional[List[ToolDefinition]] = Field(
-            description="List of tool/function definitions in OpenAI format",
-            default=None,
-        )
-        tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = Field(
-            description="Controls which (if any) function is called. Can be 'auto', 'none', or a specific function",
-            default=None,
-        )
-        response_format: Optional[ResponseFormat] = Field(
-            description="Structured output format (e.g., {'type': 'json_object'})",
-            default=None,
-        )
-        reasoning_effort: Optional[str] = Field(
-            description="Level of reasoning effort for the model",
-            default=None,
-        )
-        use_messages_endpoint: Optional[bool] = Field(
-            description="Use Anthropic-style /messages endpoint instead of /chat/completions",
-            default=False,
-        )
+class GrokOptions:
+    """Grok-specific options with LLM framework compatibility."""
+    
+    def __init__(
+        self,
+        temperature: Optional[float] = None,
+        max_completion_tokens: Optional[int] = None,
+        tools: Optional[list[ToolDefinition]] = None,
+        tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = None,
+        response_format: Optional[ResponseFormat] = None,
+        reasoning_effort: Optional[str] = None,
+        use_messages_endpoint: bool = False,
+    ) -> None:
+        self.temperature = temperature
+        self.max_completion_tokens = max_completion_tokens
+        self.tools = tools
+        self.tool_choice = tool_choice
+        self.response_format = response_format
+        self.reasoning_effort = reasoning_effort
+        self.use_messages_endpoint = use_messages_endpoint
+        
+        # LLMOptionsProtocol compatibility
+        self.max_tokens = max_completion_tokens
+
+
+class Grok:
+    """Grok model implementation with proper inheritance."""
+    
+    # Explicit declarations for Pylance - compatible with LLMBaseModel protocol
+    model_id: str
+    can_stream: bool = True
+    needs_key: Optional[str] = "grok"
+    key_env_var: Optional[str] = "XAI_API_KEY"
+
+    # For LLM framework compatibility, create a proper type alias
+    Options = GrokOptions
 
     def __init__(self, model_id: str) -> None:
         self.model_id = model_id
+        # Initialize parent if available
+        if hasattr(super(), '__init__'):
+            super().__init__(model_id)  # type: ignore
         self._openai_formatter = OpenAIFormatHandler(model_id)
         self._anthropic_formatter = AnthropicFormatHandler(model_id)
         self._image_processor = ImageProcessor(model_id)
         self._tool_processor = ToolProcessor(model_id)
         self._stream_processor = StreamProcessor(model_id)
+    
+    def get_key(self, key: Optional[str] = None) -> Optional[str]:
+        """Get API key for authentication."""
+        # For now, return the provided key or get from environment
+        # This would normally integrate with LLM's key management
+        if key:
+            return key
+        import os
+        api_key = os.environ.get(self.key_env_var or "XAI_API_KEY")
+        if api_key is None:
+            raise ValueError(f"API key not found. Set {self.key_env_var} environment variable")
+        return api_key
 
     def _get_client(self, api_key: str) -> GrokClient:
         """Get the shared GrokClient instance, creating if necessary.
@@ -122,9 +192,10 @@ class Grok(llm.KeyModel):
 
     def _get_model_capability(self, capability: str) -> bool:
         """Check if current model supports a specific capability."""
-        return MODEL_INFO.get(self.model_id, {}).get(capability, False)
+        model_info = get_model_info_safe(self.model_id)
+        return bool(model_info.get(capability, False))
 
-    def _build_message_content(self, prompt: llm.Prompt) -> Union[str, List[Union[TextContent, ImageContent]]]:
+    def _build_message_content(self, prompt: llm.Prompt) -> Union[str, list[Union[TextContent, ImageContent]]]:
         """Build message content, handling multimodal inputs for vision-capable models."""
         # Check if model supports vision
         supports_vision = self._get_model_capability("supports_vision")
@@ -134,11 +205,69 @@ class Grok(llm.KeyModel):
             return self._image_processor.process_prompt_with_attachments(prompt)
 
         # Return plain text for non-multimodal or unsupported models
-        return prompt.prompt
+        if isinstance(prompt.prompt, str):
+            return prompt.prompt
+        elif isinstance(prompt.prompt, list):
+            return self._validate_and_convert_content_list(prompt.prompt)
+        else:
+            # Convert other types to string
+            return str(prompt.prompt)
 
-    def build_messages(self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]) -> List[Message]:
+    def _validate_and_convert_content_list(
+        self, content_list: list[object]
+    ) -> list[Union[TextContent, ImageContent]]:
+        """Validate and convert content list to proper types."""
+        from .types import TextContent, ImageContent
+        
+        validated_content: list[Union[TextContent, ImageContent]] = []
+        
+        for item in content_list:
+            if isinstance(item, dict):
+                content_type = item.get("type")
+                
+                if content_type == "text":
+                    text_content: TextContent = {
+                        "type": "text",
+                        "text": str(item.get("text", ""))
+                    }
+                    validated_content.append(text_content)
+                    
+                elif content_type == "image_url":
+                    image_url_data = item.get("image_url", {})
+                    if isinstance(image_url_data, dict) and "url" in image_url_data:
+                        image_content: ImageContent = {
+                            "type": "image_url",
+                            "image_url": {"url": str(image_url_data["url"])}
+                        }
+                        validated_content.append(image_content)
+            elif isinstance(item, str):
+                # Convert string to text content
+                text_content = TextContent(type="text", text=item)
+                validated_content.append(text_content)
+        
+        return validated_content
+
+    def _convert_tools_for_anthropic(
+        self, tools: Optional[list[ToolDefinition]]
+    ) -> Optional[list[AnthropicToolDefinition]]:
+        """Convert OpenAI tools to Anthropic format."""
+        if tools is None:
+            return None
+        # Use formatter to convert - this should be implemented by Dev 1
+        return self._openai_formatter.convert_tools_to_anthropic(tools)
+
+    def _convert_tool_choice_for_anthropic(
+        self, tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]]
+    ) -> Optional[Union[Literal["auto", "none"], AnthropicToolChoice]]:
+        """Convert OpenAI tool choice to Anthropic format."""
+        if tool_choice is None:
+            return None
+        # Use formatter to convert - this should be implemented by Dev 1
+        return self._openai_formatter.convert_tool_choice_to_anthropic(tool_choice)
+
+    def build_messages(self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]) -> list[Message]:
         """Build messages array from prompt and conversation history."""
-        messages: List[Message] = []
+        messages: list[Message] = []
 
         if prompt.system:
             messages.append({"role": "system", "content": prompt.system})
@@ -154,8 +283,10 @@ class Grok(llm.KeyModel):
                 )
                 # Response objects have a text() method
                 response_text: str = ""
-                if hasattr(prev_response, 'text') and callable(prev_response.text):
-                    response_text = cast(Any, prev_response).text()
+                if is_response_like(prev_response):
+                    response_text = prev_response.text()
+                elif hasattr(prev_response, 'text') and callable(getattr(prev_response, 'text')):
+                    response_text = getattr(prev_response, 'text')()
                 else:
                     response_text = str(prev_response)
                 assistant_msg: Message = {"role": "assistant", "content": response_text}
@@ -179,7 +310,9 @@ class Grok(llm.KeyModel):
         if key is None:
             raise ValueError("API key is required but not provided")
         messages = self.build_messages(prompt, conversation)
-        response._prompt_json = {"messages": messages}
+        # Store prompt JSON if response supports it
+        if hasattr(response, '_prompt_json'):
+            response._prompt_json = {"messages": messages}  # type: ignore
 
         if not hasattr(prompt, "options") or not isinstance(prompt.options, self.Options):
             options = self.Options()
@@ -190,7 +323,7 @@ class Grok(llm.KeyModel):
         assert isinstance(options, self.Options)
 
         # Determine which endpoint to use
-        use_messages = options.use_messages_endpoint if options.use_messages_endpoint is not None else False
+        use_messages = options.use_messages_endpoint
 
         # Check for multimodal content with non-vision models
         has_images = any(
@@ -207,74 +340,33 @@ class Grok(llm.KeyModel):
         # Build request body based on endpoint
         body: RequestBody = {
             "model": self.model_id,
-            "stream": stream,
-            "temperature": options.temperature,
+            "messages": messages,  # Add required messages field
         }
+        
+        # Add optional fields with proper type validation
+        if options.temperature is not None:
+            body["temperature"] = float(options.temperature)
 
-        if use_messages:
-            # Convert to Anthropic format
-            anthropic_data = self._openai_formatter.convert_messages_to_anthropic(messages)
-            body["messages"] = anthropic_data.get("messages", [])
-            if "system" in anthropic_data:
-                body["system"] = anthropic_data["system"]
-        else:
-            # Standard OpenAI format
-            body["messages"] = messages
+        # Handle additional options
+        if options.max_completion_tokens is not None:
+            body["max_completion_tokens"] = int(options.max_completion_tokens)
 
         # Get model info for capability checks
         supports_tools = self._get_model_capability("supports_tools")
 
-        # Handle max_completion_tokens
-        if options.max_completion_tokens is not None:
-            model_info = MODEL_INFO.get(self.model_id, {})
-            max_output_tokens = model_info.get("max_output_tokens")
-
-            if max_output_tokens and options.max_completion_tokens > max_output_tokens:
-                console.print(
-                    f"[yellow]Warning: max_completion_tokens ({options.max_completion_tokens}) "
-                    f"exceeds model's limit ({max_output_tokens}). Clamping to model limit.[/yellow]"
-                )
-                if use_messages:
-                    body["max_tokens"] = max_output_tokens
-                else:
-                    body["max_completion_tokens"] = max_output_tokens
-            else:
-                if use_messages:
-                    body["max_tokens"] = options.max_completion_tokens
-                else:
-                    body["max_completion_tokens"] = options.max_completion_tokens
-
         # Add function calling parameters if model supports it
-        if supports_tools:
-            if options.tools is not None:
-                if use_messages:
-                    body["tools"] = self._openai_formatter.convert_tools_to_anthropic(options.tools)
-                else:
-                    body["tools"] = options.tools
-
+        if supports_tools and options.tools is not None:
+            body["tools"] = options.tools
+            
             if options.tool_choice is not None:
-                if use_messages:
-                    # Convert tool_choice to Anthropic format
-                    if options.tool_choice == "auto":
-                        body["tool_choice"] = {"type": "auto"}
-                    elif options.tool_choice == "none":
-                        body["tool_choice"] = {"type": "none"}
-                    elif isinstance(options.tool_choice, dict) and "function" in options.tool_choice:
-                        body["tool_choice"] = {
-                            "type": "tool",
-                            "name": options.tool_choice["function"]["name"]
-                        }
-                else:
-                    body["tool_choice"] = options.tool_choice
+                # Keep OpenAI format in RequestBody - conversion will be handled by client
+                body["tool_choice"] = options.tool_choice
 
-            if options.response_format is not None:
-                if not use_messages:
-                    body["response_format"] = options.response_format
-                else:
-                    console.print("[yellow]Warning: response_format is not supported with messages endpoint[/yellow]")
+        if options.response_format is not None:
+            body["response_format"] = options.response_format
 
         if options.reasoning_effort is not None:
-            body["reasoning_effort"] = options.reasoning_effort
+            body["reasoning_effort"] = str(options.reasoning_effort)
 
         # Get the client
         client = self._get_client(key)
@@ -306,10 +398,10 @@ class Grok(llm.KeyModel):
         self,
         client: GrokClient,
         body: RequestBody,
-        messages: List[Message],
+        messages: list[Message],
         response: llm.Response,
         use_messages: bool,
-        options: Options
+        options: GrokOptions
     ) -> Iterator[str]:
         """Handle streaming response from the API."""
         if use_messages:
@@ -319,10 +411,10 @@ class Grok(llm.KeyModel):
                 request_data=anthropic_data,
                 model=self.model_id,
                 stream=True,
-                temperature=options.temperature,
+                temperature=options.temperature or 0.7,
                 max_tokens=body.get("max_tokens"),
-                tools=body.get("tools"),
-                tool_choice=body.get("tool_choice"),
+                tools=self._convert_tools_for_anthropic(body.get("tools")),
+                tool_choice=self._convert_tool_choice_for_anthropic(body.get("tool_choice")),
                 reasoning_effort=body.get("reasoning_effort"),
             )
         else:
@@ -330,7 +422,7 @@ class Grok(llm.KeyModel):
                 messages=messages,
                 model=self.model_id,
                 stream=True,
-                temperature=options.temperature,
+                temperature=options.temperature or 0.7,
                 max_completion_tokens=body.get("max_completion_tokens"),
                 tools=body.get("tools"),
                 tool_choice=body.get("tool_choice"),
@@ -346,31 +438,31 @@ class Grok(llm.KeyModel):
         self,
         client: GrokClient,
         body: RequestBody,
-        messages: List[Message],
+        messages: list[Message],
         response: llm.Response,
         use_messages: bool,
-        options: Options
+        options: GrokOptions
     ) -> Iterator[str]:
         """Handle non-streaming response from the API."""
         if use_messages:
             # Convert messages for Anthropic endpoint
             anthropic_data = self._openai_formatter.convert_messages_to_anthropic(messages)
-            r = client.post_anthropic_messages(
+            response_obj = client.post_anthropic_messages(
                 request_data=anthropic_data,
                 model=self.model_id,
                 stream=False,
-                temperature=options.temperature,
+                temperature=options.temperature or 0.7,
                 max_tokens=body.get("max_tokens"),
-                tools=body.get("tools"),
-                tool_choice=body.get("tool_choice"),
+                tools=self._convert_tools_for_anthropic(body.get("tools")),
+                tool_choice=self._convert_tool_choice_for_anthropic(body.get("tool_choice")),
                 reasoning_effort=body.get("reasoning_effort"),
             )
         else:
-            r = client.post_openai_completion(
+            response_obj = client.post_openai_completion(
                 messages=messages,
                 model=self.model_id,
                 stream=False,
-                temperature=options.temperature,
+                temperature=options.temperature or 0.7,
                 max_completion_tokens=body.get("max_completion_tokens"),
                 tools=body.get("tools"),
                 tool_choice=body.get("tool_choice"),
@@ -378,14 +470,18 @@ class Grok(llm.KeyModel):
                 reasoning_effort=body.get("reasoning_effort"),
             )
 
-        r.raise_for_status()
-        response_data = r.json()
+        # Type narrowing: when stream=False, both methods return httpx.Response
+        assert isinstance(response_obj, httpx.Response)
+        response_obj.raise_for_status()
+        response_data = response_obj.json()
 
         # Convert response based on endpoint
         if use_messages:
             response_data = self._anthropic_formatter.convert_from_anthropic_response(response_data)
 
-        response.response_json = response_data
+        # Store response JSON if response supports it
+        if hasattr(response, 'response_json'):
+            response.response_json = response_data  # type: ignore
 
         # Process response
         if "choices" in response_data and response_data["choices"]:

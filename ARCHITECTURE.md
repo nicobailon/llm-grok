@@ -56,5 +56,3 @@ Extensive use of TypedDict and type hints for reliability.
 ### Extensibility
 Modular design allows easy addition of new models, formats, or processors.
 
-## Educational Resources
-A simplified, single-file implementation is available in `examples/consolidated_plugin.py` for learning purposes.

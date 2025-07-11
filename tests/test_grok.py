@@ -46,18 +46,12 @@ from tests.utils.mocks import (
 # Helper functions for type-safe message access
 def get_message_role(message: Message) -> str:
     """Get message role with type safety."""
-    role = message.get("role")
-    if role is None:
-        raise ValueError("Message missing required 'role' field")
-    return role
+    return message["role"]
 
 
 def get_message_content(message: Message) -> Union[str, List[Union[TextContent, ImageContent]]]:
     """Get message content with type safety."""
-    content = message.get("content")
-    if content is None:
-        raise ValueError("Message missing required 'content' field")
-    return content
+    return message["content"]
 
 
 def assert_message_has_fields(message: Message) -> None:
@@ -221,11 +215,11 @@ def test_build_messages_with_conversation(model: Grok, mock_env: None) -> None:
     from llm_grok import Grok
     
     grok = Grok(TEST_MODEL_ID)
-    conversation = Conversation(model=grok)
+    conversation = Conversation(model=cast(Model, grok))
     
     # First exchange
     prompt1 = MockPrompt("First question", model=cast(Model, grok))
-    response1 = Response(model=grok, prompt=prompt1, stream=False)
+    response1 = Response(model=cast(Model, grok), prompt=prompt1, stream=False)
     response1._chunks = ["First response"]
     response1._done = True  # Prevent re-execution when text() is called
     
@@ -254,7 +248,7 @@ def test_non_streaming_request(model: Grok, mock_response: Dict[str, object], ht
     )
     
     prompt = MockPrompt("Test prompt", model=cast(llm.Model, model))
-    response = llm.Response(model=model, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     
     # Execute the response
     result = list(response)
@@ -284,7 +278,7 @@ def test_streaming_request(model: Grok, httpx_mock: HTTPXMock, mock_env: None) -
     )
     
     prompt = MockPrompt("Test prompt", model=cast(llm.Model, model))
-    response = llm.Response(model=model, prompt=prompt, stream=True)
+    response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=True)
     
     # Collect streamed chunks
     collected = []
@@ -310,7 +304,7 @@ def test_temperature_option(model: Grok, mock_response: Dict[str, object], httpx
     )
     
     prompt = MockPrompt("Test", options=Grok.Options(temperature=0.5), model=cast(llm.Model, model))
-    response = llm.Response(model=model, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     list(response)
     
     # Verify temperature in request
@@ -329,7 +323,7 @@ def test_max_tokens_option(model: Grok, mock_response: Dict[str, object], httpx_
     )
     
     prompt = MockPrompt("Test", options=Grok.Options(max_completion_tokens=100), model=cast(llm.Model, model))
-    response = llm.Response(model=model, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     list(response)
     
     # Verify max_completion_tokens in request
@@ -350,7 +344,7 @@ def test_api_error(model: Grok, httpx_mock: HTTPXMock, mock_env: None) -> None:
     )
     
     prompt = MockPrompt("Test", model=cast(llm.Model, model))
-    response = llm.Response(model=model, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, model), prompt=prompt, stream=False)
     
     # Check that AuthenticationError is raised with correct message
     with pytest.raises(AuthenticationError) as exc_info:
@@ -476,7 +470,7 @@ def test_function_calling_in_request_body(httpx_mock: HTTPXMock, mock_env: None)
     )
     prompt = MockPrompt("Get the weather in NYC", options=options, model=cast(llm.Model, grok4))
     
-    response = llm.Response(model=grok4, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, grok4), prompt=prompt, stream=False)
     list(response)
     
     # Verify request included tools
@@ -516,7 +510,7 @@ def test_streaming_tool_calls_accumulation(httpx_mock: HTTPXMock, mock_env: None
     tools = [cast(ToolDefinition, tool) for tool in SAMPLE_TOOLS.values()]
     options = Grok.Options(tools=tools)
     prompt = MockPrompt("Get weather", options=options, model=cast(llm.Model, grok))
-    response = llm.Response(model=grok, prompt=prompt, stream=True)
+    response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=True)
     
     # Consume the stream
     content_parts = []
@@ -600,10 +594,11 @@ def test_messages_endpoint_request_format(httpx_mock: HTTPXMock) -> None:
         json=create_messages_response("Test response from messages endpoint")
     )
     
-    prompt = llm.Prompt("Hello", model=grok)
-    prompt.options = Grok.Options(use_messages_endpoint=True)
+    # Create options separately and pass to prompt
+    options = Grok.Options(use_messages_endpoint=True)
+    prompt = MockPrompt("Hello", options=options, model=cast(llm.Model, grok))
     
-    response = llm.Response(model=grok, prompt=prompt, stream=False)
+    response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=False)
     list(response)
     
     # Verify request format
@@ -630,10 +625,11 @@ def test_messages_endpoint_streaming(httpx_mock: HTTPXMock) -> None:
         content=chunks.encode()
     )
     
-    prompt = llm.Prompt("Test", model=grok)
-    prompt.options = Grok.Options(use_messages_endpoint=True)
+    # Create options separately and pass to prompt  
+    options = Grok.Options(use_messages_endpoint=True)
+    prompt = MockPrompt("Test", options=options, model=cast(llm.Model, grok))
     
-    response = llm.Response(model=grok, prompt=prompt, stream=True)
+    response = llm.Response(model=cast(llm.Model, grok), prompt=prompt, stream=True)
     
     collected = []
     for chunk in response:

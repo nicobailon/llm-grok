@@ -7,6 +7,8 @@ from llm_grok.types import (
     TextContent,
     FunctionCallDetails,
     ToolCall,
+    ToolCallWithIndex,
+    BaseMessage,
     Message,
     ToolDefinition,
     AnthropicImage,
@@ -67,34 +69,33 @@ class TestOpenAITypes:
     
     def test_tool_call_structure(self) -> None:
         """Test ToolCall structure with all fields."""
+        # Basic tool call without index
         tool_call: ToolCall = {
             "id": "call_123",
             "type": "function",
             "function": {
                 "name": "calculate",
                 "arguments": '{"x": 5, "y": 3}'
-            },
-            "index": 0
+            }
         }
         
         assert tool_call["id"] == "call_123"
         assert tool_call["type"] == "function"
         assert tool_call["function"]["name"] == "calculate"
-        assert tool_call["index"] == 0
         
-        # Test without index (since it's optional with total=False)
-        tool_call_no_index: ToolCall = {
+        # Tool call with index for streaming accumulation
+        tool_call_with_index: ToolCallWithIndex = {
             "id": "call_456",
             "type": "function",
-            "function": {"name": "test", "arguments": "{}"}
+            "function": {"name": "test", "arguments": "{}"},
+            "index": 0
         }
-        # Don't access index since it's not present and total=False makes all fields optional
-        assert "index" not in tool_call_no_index
+        assert tool_call_with_index["index"] == 0
     
     def test_message_variants(self) -> None:
         """Test different Message format variants."""
-        # Simple text message
-        simple_message: Message = {
+        # Simple text message (using BaseMessage for required fields only)
+        simple_message: BaseMessage = {
             "role": "user",
             "content": "Hello"
         }
@@ -102,7 +103,7 @@ class TestOpenAITypes:
         assert simple_message["content"] == "Hello"
         
         # Multimodal message
-        multimodal_message: Message = {
+        multimodal_message: BaseMessage = {
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's this?"},
@@ -120,8 +121,7 @@ class TestOpenAITypes:
                 {
                     "id": "call_1",
                     "type": "function",
-                    "function": {"name": "search", "arguments": "{}"},
-                    "index": 0
+                    "function": {"name": "search", "arguments": "{}"}
                 }
             ]
         }

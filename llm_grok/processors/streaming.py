@@ -235,7 +235,7 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
                         if openai_chunk and "choices" in openai_chunk and openai_chunk["choices"]:
                             choice = openai_chunk["choices"][FIRST_CHOICE_INDEX]
                             delta = choice.get("delta", {})
-                            content = self._process_stream_delta(delta, response)
+                            content = self._process_stream_delta(dict(delta), response)
                             if content:
                                 yield content
                 else:

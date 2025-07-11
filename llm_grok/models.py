@@ -4,7 +4,7 @@ This module contains model definitions, capabilities, and utility functions for 
 with different Grok model variants.
 """
 
-from typing import Dict, List, Optional
+from typing import Optional
 
 from .types import ModelInfo
 
@@ -15,6 +15,7 @@ __all__ = [
     "get_model_capability",
     "validate_model_id",
     "get_model_info",
+    "get_model_info_safe",
     "is_vision_capable",
     "is_tool_capable",
     "get_context_window",
@@ -22,7 +23,7 @@ __all__ = [
 ]
 
 # List of all available Grok models
-AVAILABLE_MODELS: List[str] = [
+AVAILABLE_MODELS: list[str] = [
     # Grok 4 models
     "x-ai/grok-4",
     "grok-4-heavy",
@@ -40,7 +41,7 @@ AVAILABLE_MODELS: List[str] = [
 DEFAULT_MODEL: str = "x-ai/grok-4"
 
 # Model capabilities metadata
-MODEL_INFO: Dict[str, ModelInfo] = {
+MODEL_INFO: dict[str, ModelInfo] = {
     "x-ai/grok-4": {
         "context_window": 256000,
         "supports_vision": True,
@@ -100,6 +101,26 @@ MODEL_INFO: Dict[str, ModelInfo] = {
 }
 
 
+def get_model_info_safe(model_id: str) -> ModelInfo:
+    """Get model information with proper typing and defaults.
+    
+    Args:
+        model_id: The model identifier
+        
+    Returns:
+        Model information with safe defaults
+    """
+    default_info: ModelInfo = {
+        "context_window": 8192,
+        "max_output_tokens": 4096,
+        "supports_tools": False,
+        "supports_vision": False,
+        "pricing_tier": "standard"
+    }
+    model_info: ModelInfo = MODEL_INFO.get(model_id, default_info)
+    return model_info
+
+
 def get_model_capability(model_id: str, capability: str) -> bool:
     """Get a specific capability for a model.
     
@@ -110,7 +131,7 @@ def get_model_capability(model_id: str, capability: str) -> bool:
     Returns:
         True if the model has the capability, False otherwise
     """
-    model_info = MODEL_INFO.get(model_id, {})
+    model_info: ModelInfo = get_model_info_safe(model_id)
     return bool(model_info.get(capability, False))
 
 

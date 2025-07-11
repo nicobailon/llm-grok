@@ -4,7 +4,9 @@ This module contains all TypedDict and type definitions for both OpenAI and Anth
 All types follow strict type safety guidelines with no use of Any where avoidable.
 """
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union, Protocol, runtime_checkable
+from collections.abc import Iterator
+from contextlib import AbstractContextManager
 
 from typing_extensions import NotRequired, Required, TypedDict, TypeGuard
 
@@ -14,23 +16,23 @@ class JSONSchemaProperty(TypedDict, total=False):
     """JSON Schema property definition."""
     type: str
     description: str
-    enum: List[str]
+    enum: list[str]
     default: Union[str, int, float, bool, None]
     minimum: Union[int, float]
     maximum: Union[int, float]
     pattern: str
     format: str
     items: "JSONSchemaProperty"
-    properties: Dict[str, "JSONSchemaProperty"]
-    required: List[str]
+    properties: dict[str, "JSONSchemaProperty"]
+    required: list[str]
     additionalProperties: Union[bool, "JSONSchemaProperty"]
 
 
 class JSONSchemaParameters(TypedDict):
     """JSON Schema for function parameters."""
     type: Literal["object"]
-    properties: Dict[str, JSONSchemaProperty]
-    required: NotRequired[List[str]]
+    properties: dict[str, JSONSchemaProperty]
+    required: NotRequired[list[str]]
     additionalProperties: NotRequired[bool]
 
 
@@ -44,7 +46,7 @@ class FunctionDefinition(TypedDict):
 class StreamEvent(TypedDict):
     """Structured streaming event."""
     type: Literal["content", "tool_calls", "error", "done"]
-    data: NotRequired[Dict[str, Union[str, List["ToolCall"]]]]
+    data: NotRequired[dict[str, Union[str, list["ToolCall"]]]]
     error: NotRequired[str]
 
 
@@ -60,6 +62,8 @@ __all__ = [
     "FunctionCall",
     "FunctionCallDetails",
     "ToolCall",
+    "ToolCallWithIndex", 
+    "BaseMessage",
     "Message",
     "ToolDefinition",
     "OpenAIResponse",
@@ -81,11 +85,21 @@ __all__ = [
     "AnthropicStreamDelta",
     "AnthropicStreamEvent",
     "AnthropicUsage",
+    "AnthropicContent",
     # Common types
     "ModelInfo",
+    "EnhancedModelInfo",
     "StreamOptions",
     "ResponseFormat",
     "ToolChoice",
+    "FunctionChoice",
+    "RequestBody",
+    # Protocol interfaces
+    "LLMModelProtocol",
+    "LLMOptionsProtocol", 
+    "LLMPromptProtocol",
+    "HTTPResponse",
+    "HTTPClient",
     # Type guards
     "is_model_info_complete",
 ]
@@ -95,7 +109,7 @@ __all__ = [
 class ImageContent(TypedDict):
     """Image content in OpenAI message format."""
     type: Literal["image_url"]
-    image_url: Dict[str, str]  # {"url": "data:image/jpeg;base64,..." or "https://..."}
+    image_url: dict[str, str]  # {"url": "data:image/jpeg;base64,..." or "https://..."}
 
 
 class TextContent(TypedDict):
@@ -117,19 +131,27 @@ class FunctionCall(TypedDict, total=False):
     function: FunctionCallDetails
 
 
-class ToolCall(TypedDict, total=False):
-    """Tool call in OpenAI format."""
+class ToolCall(TypedDict):
+    """Tool call in OpenAI format - required fields only."""
     id: str
     type: Literal["function"]
     function: FunctionCallDetails
+
+
+class ToolCallWithIndex(ToolCall, total=False):
+    """Tool call with optional index for streaming accumulation."""
     index: int
 
 
-class Message(TypedDict, total=False):
-    """OpenAI format message."""
+class BaseMessage(TypedDict):
+    """Core message fields that are always required."""
     role: Literal["system", "user", "assistant"]
-    content: Union[str, List[Union[TextContent, ImageContent]]]
-    tool_calls: List[ToolCall]
+    content: Union[str, list[Union[TextContent, ImageContent]]]
+
+
+class Message(BaseMessage, total=False):
+    """Complete message with optional fields."""
+    tool_calls: list[ToolCall]
 
 
 class ToolDefinition(TypedDict):
@@ -159,7 +181,7 @@ class OpenAIResponse(TypedDict):
     object: str
     created: int
     model: str
-    choices: List[OpenAIChoice]
+    choices: list[OpenAIChoice]
     usage: OpenAIUsage
 
 
@@ -168,7 +190,7 @@ class OpenAIStreamDelta(TypedDict, total=False):
     """Delta content in streaming response."""
     role: Optional[Literal["assistant"]]
     content: Optional[str]
-    tool_calls: Optional[List[ToolCall]]
+    tool_calls: Optional[list[ToolCall]]
 
 
 class OpenAIStreamChoice(TypedDict):
@@ -184,7 +206,7 @@ class OpenAIStreamChunk(TypedDict):
     object: str
     created: int
     model: str
-    choices: List[OpenAIStreamChoice]
+    choices: list[OpenAIStreamChoice]
 
 
 # Anthropic API Types
@@ -212,13 +234,13 @@ class AnthropicToolUse(TypedDict):
     type: Literal["tool_use"]
     id: str
     name: str
-    input: Dict[str, Union[str, int, float, bool, List[Any], Dict[str, Any]]]  # Tool-specific parameters
+    input: dict[str, Union[str, int, float, bool, list[Any], dict[str, Any]]]  # Tool-specific parameters
 
 
 class AnthropicMessage(TypedDict):
     """Anthropic format message."""
     role: Literal["user", "assistant"]
-    content: List[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]]
+    content: list[Union[AnthropicTextBlock, AnthropicImage, AnthropicToolUse]]
 
 
 class AnthropicToolChoice(TypedDict):
@@ -229,12 +251,12 @@ class AnthropicToolChoice(TypedDict):
 
 class AnthropicRequest(TypedDict, total=False):
     """Anthropic API request format."""
-    messages: Required[List[AnthropicMessage]]
+    messages: Required[list[AnthropicMessage]]
     system: str
     model: str
     max_tokens: int
     temperature: float
-    tools: List["AnthropicToolDefinition"]
+    tools: list["AnthropicToolDefinition"]
     tool_choice: Union[Literal["auto", "none"], AnthropicToolChoice]
 
 
@@ -257,7 +279,7 @@ class AnthropicResponse(TypedDict):
     id: str
     type: Literal["message"]
     role: Literal["assistant"]
-    content: List[Union[AnthropicTextBlock, AnthropicToolUse]]
+    content: list[Union[AnthropicTextBlock, AnthropicToolUse]]
     model: str
     stop_reason: Optional[str]
     stop_sequence: Optional[str]
@@ -306,11 +328,110 @@ class ResponseFormat(TypedDict):
 class ToolChoice(TypedDict):
     """Tool choice specification for OpenAI format."""
     type: Literal["function"]
-    function: Dict[Literal["name"], str]
+    function: dict[Literal["name"], str]
 
 
-# Request body types
-RequestBody = Dict[str, Union[str, int, float, bool, List[Any], Dict[str, Any]]]
+
+
+# Protocol interfaces for external libraries
+@runtime_checkable
+class LLMModelProtocol(Protocol):
+    """Protocol for LLM framework model interface."""
+    model_id: str
+    
+    def execute(self, prompt: Any, options: Any) -> Any: ...
+    def __init__(self, model_id: str) -> None: ...
+
+
+@runtime_checkable  
+class LLMOptionsProtocol(Protocol):
+    """Protocol for LLM framework options."""
+    temperature: float | None
+    max_tokens: int | None
+
+
+@runtime_checkable
+class LLMPromptProtocol(Protocol):
+    """Protocol for LLM framework prompt."""
+    prompt: str | list[Any]
+    attachments: list[Any] | None
+
+
+class HTTPResponse(Protocol):
+    """Protocol for HTTP response objects."""
+    status_code: int
+    headers: dict[str, str]
+    
+    def raise_for_status(self) -> None: ...
+    def json(self) -> dict[str, Any]: ...
+    def iter_lines(self) -> Iterator[str]: ...
+
+
+class HTTPClient(Protocol):
+    """Protocol for HTTP client objects."""
+    
+    def post(
+        self, 
+        url: str, 
+        *,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None
+    ) -> HTTPResponse: ...
+    
+    def stream(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None
+    ) -> AbstractContextManager[HTTPResponse]: ...
+
+
+# Enhanced unified request body type
+class RequestBody(TypedDict):
+    """Unified request body for both APIs."""
+    model: str
+    messages: list[Message]
+    temperature: NotRequired[float]
+    max_completion_tokens: NotRequired[int]
+    max_tokens: NotRequired[int]  # For Anthropic compatibility
+    tools: NotRequired[list[ToolDefinition]]
+    tool_choice: NotRequired[Literal["auto", "none"] | ToolChoice]
+    response_format: NotRequired[ResponseFormat]
+    reasoning_effort: NotRequired[str]
+    stream: NotRequired[bool]
+
+
+# Enhanced model info with additional capabilities
+class EnhancedModelInfo(TypedDict):
+    """Enhanced model information with all capabilities."""
+    context_window: int
+    max_output_tokens: int
+    supports_tools: bool
+    supports_vision: bool
+    supports_streaming: bool
+    supports_reasoning: NotRequired[bool]
+    api_format: NotRequired[Literal["openai", "anthropic"]]
+    pricing_tier: str
+
+
+# Content types for Anthropic API compatibility
+class AnthropicContent(TypedDict):
+    """Anthropic content block structure."""
+    type: Literal["text", "tool_use"]
+    text: NotRequired[str]
+    id: NotRequired[str]
+    name: NotRequired[str]
+    input: NotRequired[dict[str, Any]]
+
+
+# Enhanced Tool Choice for specific function selection
+class FunctionChoice(TypedDict):
+    """Function choice specification."""
+    name: str
 
 
 # Type guards for runtime safety

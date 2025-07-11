@@ -4,7 +4,7 @@ This module defines custom exceptions for handling various API errors and
 validation issues.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 __all__ = [
     "GrokError",
@@ -30,7 +30,7 @@ class GrokError(Exception):
     def __init__(
         self,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         error_code: Optional[str] = None
     ) -> None:
         self.message = message
@@ -55,7 +55,7 @@ class RateLimitError(GrokError):
     def __init__(
         self,
         message: str = "Rate limit exceeded",
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         retry_after: Optional[int] = None
     ) -> None:
         super().__init__(message, details, error_code="rate_limit_error")
@@ -71,7 +71,7 @@ class QuotaExceededError(GrokError):
     def __init__(
         self,
         message: str = "API quota exceeded",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="quota_exceeded_error")
 
@@ -89,7 +89,7 @@ class ValidationError(GrokError):
         self,
         message: str,
         field: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="validation_error")
         self.field = field
@@ -110,7 +110,7 @@ class ConversionError(GrokError):
         message: str,
         source_format: Optional[str] = None,
         target_format: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="conversion_error")
         self.source_format = source_format
@@ -128,7 +128,7 @@ class APIError(GrokError):
         self,
         message: str,
         status_code: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="api_error")
         self.status_code = status_code
@@ -143,7 +143,7 @@ class AuthenticationError(GrokError):
     def __init__(
         self,
         message: str = "Authentication failed",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="authentication_error")
 
@@ -161,7 +161,7 @@ class NetworkError(GrokError):
         self,
         message: str = "Network error occurred",
         original_error: Optional[Exception] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
     ) -> None:
         super().__init__(message, details, error_code="network_error")
         self.original_error = original_error

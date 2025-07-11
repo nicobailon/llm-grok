@@ -46,6 +46,13 @@ pytest tests/test_grok.py
 pytest tests/test_grok.py::test_model_initialization
 ```
 
+### Type Checking
+
+```bash
+# Run type checker
+mypy llm_grok --strict
+```
+
 ### Building and Publishing
 
 ```bash
@@ -55,8 +62,6 @@ python -m build
 # Upload to PyPI (requires credentials)
 python -m twine upload dist/*
 ```
-
-## Architecture
 
 ## Architecture
 
@@ -87,7 +92,6 @@ llm_grok/
 - Extend formatters for new API formats
 - Use the type system for safety
 
-**Educational Reference**: The `examples/consolidated_plugin.py` provides a simplified view of the core logic but should not be used for production development.
 
 ### **Key Patterns**
 
@@ -313,9 +317,8 @@ if "tool_calls" in delta:
 
 When working on this codebase:
 - **Use the modular implementation** (`llm_grok/` package) for all development work
-- The educational implementation exists in `examples/` for learning purposes only
-- Focus on the production modular architecture for all changes
-- The examples provide simplified reference implementations for understanding core concepts
+- Focus on the production modular architecture for all development work
+- Use the comprehensive documentation in ARCHITECTURE.md to understand core concepts
 
 
 

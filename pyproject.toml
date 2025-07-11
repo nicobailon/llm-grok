@@ -1,5 +1,5 @@
 [project]
-name = "llm-grok-plugin"
+name = "llm-grok"
 version = "1.0.0"
 description = "LLM plugin providing access to Grok models using the xAI API"
 readme = "README.md"
