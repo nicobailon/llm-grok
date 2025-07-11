@@ -70,9 +70,12 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
 
                 # Try to parse as OpenAI format first
                 while True:
-                    parsed_data, buffer = self._openai_formatter.parse_openai_sse(buffer)
+                    parsed_data, remaining_buffer = self._openai_formatter.parse_openai_sse(buffer)
                     if parsed_data is None:
                         break
+                    
+                    # Update buffer with remaining content after successful parse
+                    buffer = remaining_buffer
 
                     if parsed_data.get("done"):
                         yield {"type": "done", "data": {}}
@@ -193,6 +196,8 @@ class StreamProcessor(ContentProcessor[Iterator[bytes], Iterator[Dict[str, Any]]
                 tool_call["function"]["name"] = func_delta["name"]
             if "arguments" in func_delta:
                 # Accumulate arguments string
+                if "arguments" not in tool_call["function"]:
+                    tool_call["function"]["arguments"] = ""
                 tool_call["function"]["arguments"] += func_delta["arguments"]
 
     def process_stream(self, http_response: Any, response: Any, use_messages: bool) -> Iterator[str]:

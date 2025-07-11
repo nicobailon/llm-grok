@@ -247,7 +247,7 @@ class AnthropicFormatHandler(FormatHandler):
                         "type": "tool_use",
                         "id": tool_call["id"],
                         "name": func["name"],
-                        "input": json.loads(func["arguments"]) if isinstance(func["arguments"], str) else func["arguments"]
+                        "input": json.loads(func.get("arguments", "{}")) if isinstance(func.get("arguments"), str) else func.get("arguments", {})
                     })
 
                 anthropic_msg["content"] = content_parts
@@ -296,7 +296,7 @@ class AnthropicFormatHandler(FormatHandler):
                         "arguments": part.get("input", {})
                     }
                 }
-                if isinstance(tool_call["function"]["arguments"], dict):
+                if "arguments" in tool_call["function"] and isinstance(tool_call["function"]["arguments"], dict):
                     tool_call["function"]["arguments"] = json.dumps(tool_call["function"]["arguments"])
                 tool_calls.append(tool_call)
 

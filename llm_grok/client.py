@@ -72,9 +72,9 @@ class GrokClient:
     MAX_BUFFER_SIZE = 100 * 1024 * 1024  # 100MB - maximum streaming buffer size
 
     # Circuit breaker settings
-    CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5  # Number of consecutive failures before opening circuit
-    CIRCUIT_BREAKER_RECOVERY_TIMEOUT = 60  # seconds to wait before attempting recovery
-    CIRCUIT_BREAKER_HALF_OPEN_REQUESTS = 1  # Number of test requests in half-open state
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5  # Number of consecutive failures before opening circuit
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT: float = 60  # seconds to wait before attempting recovery
+    CIRCUIT_BREAKER_HALF_OPEN_REQUESTS: int = 1  # Number of test requests in half-open state
 
     def __init__(
         self,
@@ -112,10 +112,12 @@ class GrokClient:
         self._circuit_opened_at: Optional[float] = None
         self._half_open_requests = 0
 
-        # JSON size estimation cache
+        # JSON size estimation cache with memory monitoring
         self._json_size_cache: dict[str, int] = {}
         self._cache_lock = threading.Lock()
-        self.MAX_CACHE_SIZE = 100  # Limit cache size to prevent memory issues
+        self.MAX_CACHE_SIZE: int = 100  # Limit cache size to prevent memory issues
+        self.MAX_CACHE_MEMORY: int = 1024 * 1024  # 1MB max cache memory usage
+        self._cache_memory_usage = 0  # Track current cache memory usage
 
     def __enter__(self) -> "GrokClient":
         """Enter context manager for proper resource management."""
@@ -126,13 +128,21 @@ class GrokClient:
         """Exit context manager and cleanup resources."""
         if not self._is_closed:
             self._client_pool.__exit__(*args)
+            self._cleanup_cache()
             self._is_closed = True
 
     def close(self) -> None:
         """Manually close the client pool."""
         if not self._is_closed:
             self._client_pool.close()
+            self._cleanup_cache()
             self._is_closed = True
+
+    def _cleanup_cache(self) -> None:
+        """Clean up the JSON size cache and reset memory tracking."""
+        with self._cache_lock:
+            self._json_size_cache.clear()
+            self._cache_memory_usage = 0
 
     def _log_request(self, method: str, url: str, headers: dict[str, str], body: RequestBody) -> None:
         """Log outgoing request details."""
@@ -218,12 +228,22 @@ class GrokClient:
         # Compute actual size
         request_size = len(json.dumps(json_data).encode('utf-8'))
 
-        # Update cache with size limit
+        # Update cache with size and memory limits
         with self._cache_lock:
-            # If cache is too large, clear it
-            if len(self._json_size_cache) >= self.MAX_CACHE_SIZE:
+            # Estimate memory usage of the cache key and value
+            key_memory = len(cache_key.encode('utf-8'))
+            value_memory = 8  # int size in Python (approximate)
+            entry_memory = key_memory + value_memory
+            
+            # If adding this entry would exceed memory limit or size limit, clear cache
+            if (self._cache_memory_usage + entry_memory > self.MAX_CACHE_MEMORY or 
+                len(self._json_size_cache) >= self.MAX_CACHE_SIZE):
                 self._json_size_cache.clear()
-
+                self._cache_memory_usage = 0
+            
+            # Add entry and update memory tracking
+            if cache_key not in self._json_size_cache:
+                self._cache_memory_usage += entry_memory
             self._json_size_cache[cache_key] = request_size
 
         return request_size

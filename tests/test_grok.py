@@ -21,7 +21,7 @@ from llm_grok import (
 from llm_grok.grok import GrokOptions
 from llm_grok.exceptions import AuthenticationError
 from llm.models import ToolCall
-from llm_grok.types import TextContent, ImageContent
+from llm_grok.types import TextContent, ImageContent, RequestBody
 from tests.utils.mocks import (
     TEST_API_KEY,
     TEST_MODEL_ID,
@@ -643,3 +643,52 @@ def test_messages_endpoint_streaming(httpx_mock: HTTPXMock) -> None:
     full_response = "".join(collected)
     # Accept any non-empty response as the exact format may vary
     assert len(full_response.strip()) > 0, f"Got empty response, collected: {collected}"
+
+
+def test_json_cache_memory_monitoring() -> None:
+    """Test that JSON cache monitors memory usage and prevents leaks."""
+    from llm_grok.client import GrokClient
+    
+    client = GrokClient("test-key")
+    
+    # Test initial state
+    assert client._cache_memory_usage == 0
+    assert len(client._json_size_cache) == 0
+    
+    # Test memory tracking with cache entries
+    test_data_small: RequestBody = {"model": "test", "messages": []}
+    test_data_large: RequestBody = {"model": "test-large", "messages": []}  # Large payload
+    
+    # Estimate sizes
+    size1 = client._estimate_json_size(test_data_small)
+    assert size1 > 0
+    assert client._cache_memory_usage > 0
+    assert len(client._json_size_cache) == 1
+    
+    initial_memory = client._cache_memory_usage
+    
+    # Add another entry
+    size2 = client._estimate_json_size(test_data_large)
+    assert size2 > size1
+    assert client._cache_memory_usage > initial_memory
+    assert len(client._json_size_cache) == 2
+    
+    # Test cache limits by setting low memory limit
+    original_limit = client.MAX_CACHE_MEMORY
+    client.MAX_CACHE_MEMORY = 50  # Very low limit
+    
+    # Adding this should trigger cache clearing
+    test_data_another: RequestBody = {"model": "another", "messages": []}
+    size3 = client._estimate_json_size(test_data_another)
+    assert client._cache_memory_usage < initial_memory  # Cache was cleared
+    assert len(client._json_size_cache) == 1  # Only new entry remains
+    
+    # Test cleanup
+    client._cleanup_cache()
+    assert client._cache_memory_usage == 0
+    assert len(client._json_size_cache) == 0
+    
+    # Restore original cache memory limit
+    client.MAX_CACHE_MEMORY = original_limit
+    
+    client.close()

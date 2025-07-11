@@ -666,20 +666,15 @@ class OpenAIFormatHandler(FormatHandler):
         openai_tools: list[ToolDefinition] = []
 
         for tool in anthropic_tools:
-            # Support both direct tool format and wrapped format
-            if "function" in tool:
-                # Already in OpenAI format
-                openai_tools.append(tool)  # type: ignore
-            else:
-                # Convert from Anthropic format
-                openai_tool: ToolDefinition = {
-                    "type": "function",
-                    "function": {
-                        "name": tool.get("name", ""),
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("input_schema", {"type": "object", "properties": {}})
-                    }
+            # Convert from Anthropic format to OpenAI format
+            openai_tool: ToolDefinition = {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool["input_schema"]
                 }
-                openai_tools.append(openai_tool)
+            }
+            openai_tools.append(openai_tool)
 
         return openai_tools
