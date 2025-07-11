@@ -1,7 +1,8 @@
 """Tool calling and function execution processing."""
 import json
 import logging
-from typing import Optional, Union, TypeGuard, Protocol, runtime_checkable, Dict, cast, Any
+from typing import Optional, Union, Protocol, runtime_checkable, Dict, cast, Any
+from typing_extensions import TypeGuard
 
 from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
 

@@ -8,7 +8,8 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Literal, Optional, Union, cast, TypeGuard
+from typing import Any, Literal, Optional, Union, cast
+from typing_extensions import TypeGuard
 from contextlib import AbstractContextManager
 
 import httpx

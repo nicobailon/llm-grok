@@ -2,32 +2,20 @@
 import sys
 import threading
 from collections.abc import Iterator
-from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, TypeGuard, Dict, Any, ClassVar
+from typing import Literal, Optional, Union, cast, TYPE_CHECKING, Protocol, runtime_checkable, Dict, Any, ClassVar, Type
+from typing_extensions import TypeGuard
 from contextlib import AbstractContextManager
 
 import httpx
 import llm
-from pydantic import Field
+from pydantic import Field, BaseModel
 from rich import print as rprint
 from rich.console import Console
 from rich.panel import Panel
 
-if TYPE_CHECKING:
-    from llm import KeyModel as LLMKeyModel
-    from llm.models import Options as LLMOptionsBase
-    LLM_AVAILABLE = True
-else:
-    try:
-        from llm import KeyModel as LLMKeyModel
-        from llm.models import Options as LLMOptionsBase
-        LLM_AVAILABLE = True
-    except ImportError:
-        LLM_AVAILABLE = False
-        # Create a proper base class for fallback
-        class LLMOptionsBase:
-            pass
-        class LLMKeyModel:
-            pass
+# Import LLM framework components
+from llm import KeyModel as LLMKeyModel
+from llm.models import Options as LLMOptionsBase
 
 from .client import GrokClient
 from .exceptions import (
@@ -169,24 +157,6 @@ _client_lock = threading.Lock()
 _current_api_key: Optional[str] = None
 
 
-class GrokOptions(LLMOptionsBase):
-    """Grok-specific options with LLM framework compatibility."""
-    
-    temperature: Optional[float] = Field(default=0.0)
-    max_completion_tokens: Optional[int] = Field(default=None)
-    tools: Optional[list[ToolDefinition]] = Field(default=None)
-    tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = Field(default=None)
-    response_format: Optional[ResponseFormat] = Field(default=None)
-    reasoning_effort: Optional[str] = Field(default=None)
-    use_messages_endpoint: bool = Field(default=False)
-    max_tokens: Optional[int] = Field(default=None)  # LLMOptionsProtocol compatibility
-    
-    def model_post_init(self, __context: Any) -> None:
-        # LLMOptionsProtocol compatibility - sync max_tokens with max_completion_tokens
-        if self.max_completion_tokens is not None:
-            object.__setattr__(self, 'max_tokens', self.max_completion_tokens)
-
-
 class GrokMixin(LLMKeyModel):
     """Mixin class containing all Grok implementation."""
     
@@ -194,9 +164,22 @@ class GrokMixin(LLMKeyModel):
     needs_key: Optional[str] = "grok"
     key_env_var: Optional[str] = "XAI_API_KEY"
     
-    # LLM framework requires this attribute for options class compatibility
-    # External LLM library expects this assignment pattern but has incomplete type annotations
-    Options = GrokOptions  # pyright: ignore[reportAssignmentType]
+    class Options(LLMOptionsBase):  # pyright: ignore[reportIncompatibleVariableOverride]
+        """Grok-specific options with LLM framework compatibility."""
+        
+        temperature: Optional[float] = Field(default=0.0)
+        max_completion_tokens: Optional[int] = Field(default=None)
+        tools: Optional[list[ToolDefinition]] = Field(default=None)
+        tool_choice: Optional[Union[Literal["auto", "none"], ToolChoice]] = Field(default=None)
+        response_format: Optional[ResponseFormat] = Field(default=None)
+        reasoning_effort: Optional[str] = Field(default=None)
+        use_messages_endpoint: bool = Field(default=False)
+        max_tokens: Optional[int] = Field(default=None)  # LLMOptionsProtocol compatibility
+        
+        def model_post_init(self, __context: Any) -> None:
+            # LLMOptionsProtocol compatibility - sync max_tokens with max_completion_tokens
+            if self.max_completion_tokens is not None:
+                object.__setattr__(self, 'max_tokens', self.max_completion_tokens)
 
     def __init__(self, model_id: str) -> None:
         super().__init__()
@@ -353,7 +336,7 @@ class GrokMixin(LLMKeyModel):
                 "stream": stream
             }
             
-            grok_options = GrokOptions()
+            grok_options = self.Options()
             # Extract options from prompt.options using type guards for type safety
             options = prompt.options
             if options:
@@ -433,7 +416,7 @@ class GrokMixin(LLMKeyModel):
         endpoint_url: str,
         body: Dict[str, Any],
         response: llm.Response,
-        options: GrokOptions
+        options: "GrokMixin.Options"
     ) -> Iterator[str]:
         """Handle streaming response from API."""
         try:
@@ -484,7 +467,7 @@ class GrokMixin(LLMKeyModel):
         endpoint_url: str,
         body: Dict[str, Any],
         response: llm.Response,
-        options: GrokOptions
+        options: "GrokMixin.Options"
     ) -> Iterator[str]:
         """Handle non-streaming response from API."""
         try:
@@ -616,6 +599,10 @@ class GrokMixin(LLMKeyModel):
 class Grok(GrokMixin):
     """Grok model implementation."""
     pass
+
+
+# Type alias for backward compatibility in tests and external usage
+GrokOptions = GrokMixin.Options
 
 
 def cleanup_shared_resources() -> None:
