@@ -1,0 +1,13 @@
+#!/bin/bash
+echo "🔧 Manual GitHub Repository Settings to Update:"
+echo ""
+echo "Description: Enhanced LLM plugin for xAI Grok models with enterprise features"
+echo "Website: https://github.com/nicobailon/llm-grok"
+echo "Topics: llm, grok, xai, plugin, enhanced, python, ai, enterprise"
+echo ""
+echo "📝 Steps:"
+echo "1. Go to: https://github.com/nicobailon/llm-grok/settings"
+echo "2. Update Description field"
+echo "3. Update Website field" 
+echo "4. Add Topics in the About section"
+echo "5. Consider removing fork relationship (Contact GitHub support if needed)"

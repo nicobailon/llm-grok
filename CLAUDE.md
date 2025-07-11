@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is `llm-grok`, a Python plugin for the [LLM](https://llm.datasette.io/) CLI tool that provides access to Grok models using the xAI API. The plugin is published to PyPI and enables users to interact with various Grok models through the command line.
+This is `llm-grok-enhanced`, a Python plugin for the [LLM](https://llm.datasette.io/) CLI tool that provides access to Grok models using the xAI API. The plugin is published to PyPI and enables users to interact with various Grok models through the command line.
 
 **Current Version**: 2.1.0 (with /messages endpoint support)
 
@@ -65,7 +65,7 @@ python -m twine upload dist/*
 
 ## Architecture
 
-The llm-grok plugin uses a modular architecture optimized for maintainability and enterprise use:
+The llm-grok-enhanced plugin uses a modular architecture optimized for maintainability and enterprise use:
 
 ### **Core Structure**
 ```
@@ -334,6 +334,14 @@ user: Any = get_user()  # NO
 result = operation()  # type: ignore  # NO
 Status = str  # NO - use Literal/Enum
 ```
+
+**CRITICAL: Avoid `# type: ignore` comments**
+- If mypy flags `# type: ignore` as unused, the underlying type issue may have been resolved
+- Always remove unused `# type: ignore` comments immediately
+- Use proper type-safe alternatives instead:
+  - `setattr(obj, 'attr', value)` for dynamic attribute assignment
+  - Type guards and runtime checks for unknown types
+  - Proper type annotations and protocols
 
 **REQUIRED Practices:**
 ```python

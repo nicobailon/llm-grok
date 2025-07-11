@@ -1,0 +1,3 @@
+SELECTED_PACKAGE_NAME=llm-grok-enhanced
+SELECTED_ENTRY_POINT=grok-enhanced
+MODULE_NAME=llm_grok

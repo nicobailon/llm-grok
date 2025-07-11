@@ -63,6 +63,8 @@ __all__ = [
     "FunctionCallDetails",
     "ToolCall",
     "ToolCallWithIndex", 
+    "RawFunctionCall",
+    "RawToolCall", 
     "BaseMessage",
     "Message",
     "ToolDefinition",
@@ -141,6 +143,21 @@ class ToolCall(TypedDict):
 class ToolCallWithIndex(ToolCall, total=False):
     """Tool call with optional index for streaming accumulation."""
     index: int
+
+
+# Raw API response types for proper typing during processing
+class RawFunctionCall(TypedDict, total=False):
+    """Raw function call data from API responses."""
+    name: str
+    arguments: str
+
+
+class RawToolCall(TypedDict, total=False):
+    """Raw tool call data from API responses."""
+    id: str
+    type: str
+    function: RawFunctionCall
+    index: int  # For streaming responses
 
 
 class BaseMessage(TypedDict):

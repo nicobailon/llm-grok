@@ -572,8 +572,10 @@ class OpenAIFormatHandler(FormatHandler):
 
     def _convert_anthropic_message_to_openai(self, msg: AnthropicMessage) -> Message:
         """Convert a single Anthropic message to OpenAI format."""
+        openai_msg: Message
+        
         if isinstance(msg["content"], str):
-            openai_msg: Message = {"role": msg["role"], "content": msg["content"]}
+            openai_msg = {"role": msg["role"], "content": msg["content"]}
         elif isinstance(msg["content"], list):
             # Handle multimodal content
             content = self._convert_anthropic_content_to_openai(msg["content"])
@@ -589,7 +591,7 @@ class OpenAIFormatHandler(FormatHandler):
                     content_value = ""
 
                 # Create message with tool calls
-                openai_msg: Message = {
+                openai_msg = {
                     "role": msg["role"],
                     "content": content_value,
                     "tool_calls": [
@@ -605,10 +607,10 @@ class OpenAIFormatHandler(FormatHandler):
                     ]
                 }
             else:
-                openai_msg: Message = {"role": msg["role"], "content": content}
+                openai_msg = {"role": msg["role"], "content": content}
         else:
             # Fallback for unexpected content types
-            openai_msg: Message = {"role": msg["role"], "content": ""}
+            openai_msg = {"role": msg["role"], "content": ""}
 
         return openai_msg
 

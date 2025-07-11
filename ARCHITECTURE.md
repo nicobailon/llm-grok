@@ -1,7 +1,7 @@
-# LLM-Grok Architecture
+# LLM-Grok-Enhanced Architecture
 
 ## Overview
-The llm-grok plugin uses a modular architecture designed for enterprise-grade reliability, maintainability, and extensibility.
+The llm-grok-enhanced plugin uses a modular architecture designed for enterprise-grade reliability, maintainability, and extensibility.
 
 ## Core Components
 

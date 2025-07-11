@@ -1,7 +1,9 @@
-"""llm-grok: A Python plugin for LLM CLI providing access to Grok models.
+"""llm-grok-enhanced: Enhanced Python plugin for LLM CLI providing advanced access to Grok models.
 
-This package provides modular components for interacting with xAI's Grok models
-through both OpenAI-compatible and Anthropic-compatible APIs.
+This package provides enhanced modular components for interacting with xAI's Grok models
+with enterprise-grade features, improved reliability, and advanced capabilities.
+
+Original work by Benedikt Hiepler, enhanced and maintained by Nico Bailon.
 """
 
 from rich.console import Console

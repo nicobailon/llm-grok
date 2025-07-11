@@ -11,7 +11,7 @@ RegisterFunction = Callable[..., None]
 CLIObject = Any  # External library, can't be more specific
 
 
-@llm.hookimpl  # type: ignore[misc]
+@llm.hookimpl
 def register_models(register: RegisterFunction) -> None:
     """Register all available Grok models with LLM CLI.
     
@@ -22,7 +22,7 @@ def register_models(register: RegisterFunction) -> None:
         register(model_id, Grok)
 
 
-@llm.hookimpl  # type: ignore[misc]
+@llm.hookimpl
 def register_commands(cli: CLIObject) -> None:
     """Register additional CLI commands.
     

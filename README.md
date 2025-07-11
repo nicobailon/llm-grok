@@ -1,17 +1,28 @@
-# llm-grok
+# llm-grok-enhanced
 
-[![PyPI](https://img.shields.io/pypi/v/llm-grok.svg)](https://pypi.org/project/llm-grok/)
-[![Tests](https://github.com/hiepler/llm-grok/workflows/Test/badge.svg)](https://github.com/hiepler/llm-grok/actions?query=workflow%3ATest)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/hiepler/llm-grok/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/llm-grok-enhanced.svg)](https://pypi.org/project/llm-grok-enhanced/)
+[![Tests](https://github.com/nicobailon/llm-grok/workflows/Test/badge.svg)](https://github.com/nicobailon/llm-grok/actions?query=workflow%3ATest)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/nicobailon/llm-grok/blob/main/LICENSE)
 
-Plugin for [LLM](https://llm.datasette.io/) providing access to Grok models using the xAI API
+Enhanced plugin for [LLM](https://llm.datasette.io/) providing advanced access to Grok models using the xAI API with enterprise-grade features and improved reliability.
+
+## 🚀 Enhanced Features
+
+This enhanced version builds upon the original llm-grok with significant improvements:
+
+- **🏗️ Modular Architecture**: Enterprise-grade component-based design
+- **🔒 Enhanced Security**: SSRF protection and advanced error handling
+- **⚡ Performance**: Connection pooling and circuit breakers
+- **🎯 Type Safety**: Comprehensive TypedDict coverage
+- **🔧 Reliability**: Improved retry logic and error recovery
+- **📊 Advanced Monitoring**: Rich terminal UI with progress indicators
 
 ## Installation
 
-Install this plugin in the same environment as LLM:
+Install this enhanced plugin in the same environment as LLM:
 
 ```bash
-llm install llm-grok
+llm install llm-grok-enhanced
 ```
 
 ## Usage
@@ -171,7 +182,7 @@ The messages endpoint provides better handling of:
 
 ## Architecture
 
-The llm-grok plugin uses a clean, modular architecture optimized for reliability and maintainability:
+The llm-grok-enhanced plugin uses a clean, modular architecture optimized for reliability and maintainability:
 
 ### 🏗️ **Component-Based Design**
 - **Processors**: Handle content transformation (multimodal, streaming, tools)
@@ -194,7 +205,7 @@ For understanding the core concepts, refer to the modular architecture documenta
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:
 
 ```bash
-git clone https://github.com/hiepler/llm-grok.git
+git clone https://github.com/nicobailon/llm-grok.git
 cd llm-grok
 python3 -m venv venv
 source venv/bin/activate
@@ -319,6 +330,10 @@ For vision-capable models (Grok 4, Grok 2 Vision):
 - Handles URLs, local files, and base64-encoded data
 - Automatic MIME type detection
 - Images are converted to base64 data URLs when needed
+
+## Attribution
+
+This project is an enhanced version of the original [llm-grok](https://github.com/Hiepler/llm-grok) by Benedikt Hiepler. See [ATTRIBUTION.md](ATTRIBUTION.md) for full attribution details.
 
 ## Contributing
 
