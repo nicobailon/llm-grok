@@ -258,7 +258,7 @@ class TestCircuitBreakerThreadSafety:
         
         # Verify lock exists
         assert hasattr(client, '_circuit_breaker_lock')
-        assert isinstance(client._circuit_breaker_lock, threading.Lock)
+        assert isinstance(client._circuit_breaker_lock, type(threading.Lock()))
 
 
 class TestCircuitBreakerStreamingSupport:
