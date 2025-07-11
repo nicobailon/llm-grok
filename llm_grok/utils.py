@@ -1,13 +1,14 @@
 """Simple utility functions for format conversion and SSE parsing."""
 
 import json
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from collections.abc import Iterator
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def parse_openai_sse(chunk: bytes) -> Iterator[Dict[str, Any]]:
     """Parse OpenAI Server-Sent Events chunks."""
     text = chunk.decode('utf-8', errors='ignore')
-    
+
     for line in text.split('\n'):
         if line.startswith('data: '):
             data = line[6:].strip()
@@ -22,7 +23,7 @@ def parse_openai_sse(chunk: bytes) -> Iterator[Dict[str, Any]]:
 def parse_anthropic_sse(chunk: bytes) -> Iterator[Tuple[str, Dict[str, Any]]]:
     """Parse Anthropic Server-Sent Events chunks."""
     text = chunk.decode('utf-8', errors='ignore')
-    
+
     event_type = None
     for line in text.split('\n'):
         if line.startswith('event: '):
@@ -39,17 +40,17 @@ def convert_to_anthropic_messages(messages: List[Dict[str, Any]]) -> Dict[str, A
     """Convert OpenAI messages to Anthropic format."""
     system_prompts: List[str] = []
     anthropic_messages: List[Dict[str, Any]] = []
-    
+
     for msg in messages:
         role = msg.get("role", "")
         content = msg.get("content", "")
-        
+
         if role == "system":
             if isinstance(content, str):
                 system_prompts.append(content)
         elif role in ["user", "assistant"]:
             anthropic_msg: Dict[str, Any] = {"role": role, "content": []}
-            
+
             if isinstance(content, str):
                 anthropic_msg["content"] = [{"type": "text", "text": content}]
             else:
@@ -57,7 +58,7 @@ def convert_to_anthropic_messages(messages: List[Dict[str, Any]]) -> Dict[str, A
                 for part in content:
                     if part["type"] == "text":
                         anthropic_msg["content"].append({
-                            "type": "text", 
+                            "type": "text",
                             "text": part["text"]
                         })
                     elif part["type"] == "image_url":
@@ -79,26 +80,26 @@ def convert_to_anthropic_messages(messages: List[Dict[str, Any]]) -> Dict[str, A
                                 "type": "image",
                                 "source": {"type": "url", "url": url}
                             })
-            
+
             anthropic_messages.append(anthropic_msg)
-    
+
     result: Dict[str, Any] = {"messages": anthropic_messages}
     if system_prompts:
         result["system"] = "\n\n".join(system_prompts)
-    
+
     return result
 
 
 def convert_anthropic_to_openai_response(anthropic_response: Dict[str, Any], model_id: str) -> Dict[str, Any]:
     """Convert Anthropic response to OpenAI format."""
     content_parts = []
-    
+
     for block in anthropic_response.get("content", []):
         if block["type"] == "text":
             content_parts.append(block["text"])
-    
+
     content = "".join(content_parts)
-    
+
     # Build OpenAI response
     return {
         "id": anthropic_response.get("id", ""),
@@ -145,7 +146,7 @@ def convert_anthropic_stream_to_openai(event_type: str, event_data: Dict[str, An
     elif event_type == "message_stop":
         return {
             "id": "",
-            "object": "chat.completion.chunk", 
+            "object": "chat.completion.chunk",
             "created": 0,
             "model": model_id,
             "choices": [{
@@ -154,5 +155,5 @@ def convert_anthropic_stream_to_openai(event_type: str, event_data: Dict[str, An
                 "finish_reason": "stop"
             }]
         }
-    
+
     return None

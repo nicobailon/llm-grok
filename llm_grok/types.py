@@ -5,7 +5,9 @@ All types follow strict type safety guidelines with no use of Any where avoidabl
 """
 
 from typing import Any, Dict, List, Literal, Optional, Union
-from typing_extensions import TypedDict, NotRequired, Required, TypeGuard
+
+from typing_extensions import NotRequired, Required, TypedDict, TypeGuard
+
 
 # JSON Schema types for better type safety
 class JSONSchemaProperty(TypedDict, total=False):
@@ -323,11 +325,11 @@ def is_model_info_complete(obj: Any) -> TypeGuard[ModelInfo]:
     """
     if not isinstance(obj, dict):
         return False
-    
+
     required_keys = {"context_window", "supports_vision", "supports_tools", "pricing_tier", "max_output_tokens"}
     if not all(key in obj for key in required_keys):
         return False
-    
+
     # Type check each field
     return (
         isinstance(obj.get("context_window"), int) and

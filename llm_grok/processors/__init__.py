@@ -4,7 +4,7 @@ This module provides the base interfaces and common functionality
 for processing various types of content in the Grok plugin.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Dict, List, TypeVar, Generic
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 # Import base exception from parent for inheritance
 from ..exceptions import GrokError
@@ -19,7 +19,7 @@ class ContentProcessor(ABC, Generic[T, R]):
     All processors should inherit from this class and implement
     the process method for their specific content type.
     """
-    
+
     @abstractmethod
     def process(self, content: T) -> R:
         """Process the given content.
@@ -50,7 +50,7 @@ class ValidationError(ProcessingError):
     Extends ProcessingError to maintain a consistent error hierarchy
     for processor-specific validation errors.
     """
-    def __init__(self, message: str, field: Optional[str] = None, 
+    def __init__(self, message: str, field: Optional[str] = None,
                  details: Optional[Dict[str, Any]] = None):
         # Initialize with validation_error code for consistency
         super().__init__(message, details=details, error_code="validation_error")
@@ -59,7 +59,7 @@ class ValidationError(ProcessingError):
 
 class ProcessorConfig:
     """Configuration for processors."""
-    
+
     def __init__(self, **kwargs: Any) -> None:
         """Initialize processor configuration.
         
@@ -67,7 +67,7 @@ class ProcessorConfig:
             **kwargs: Configuration parameters
         """
         self._config = kwargs
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value.
         
@@ -79,7 +79,7 @@ class ProcessorConfig:
             Configuration value
         """
         return self._config.get(key, default)
-    
+
     def set(self, key: str, value: Any) -> None:
         """Set configuration value.
         
@@ -88,7 +88,7 @@ class ProcessorConfig:
             value: Configuration value
         """
         self._config[key] = value
-    
+
     def update(self, **kwargs: Any) -> None:
         """Update multiple configuration values.
         
@@ -100,11 +100,11 @@ class ProcessorConfig:
 
 class ProcessorRegistry:
     """Registry for managing processors."""
-    
+
     def __init__(self) -> None:
         """Initialize processor registry."""
         self._processors: Dict[str, ContentProcessor[Any, Any]] = {}
-    
+
     def register(self, name: str, processor: ContentProcessor[Any, Any]) -> None:
         """Register a processor.
         
@@ -113,7 +113,7 @@ class ProcessorRegistry:
             processor: Processor instance
         """
         self._processors[name] = processor
-    
+
     def get(self, name: str) -> Optional[ContentProcessor[Any, Any]]:
         """Get a processor by name.
         
@@ -124,7 +124,7 @@ class ProcessorRegistry:
             Processor instance or None if not found
         """
         return self._processors.get(name)
-    
+
     def list(self) -> List[str]:
         """List all registered processor names.
         
@@ -136,8 +136,8 @@ class ProcessorRegistry:
 
 # Import concrete processors
 from .multimodal import ImageProcessor
-from .tools import ToolProcessor
 from .streaming import StreamProcessor
+from .tools import ToolProcessor
 
 __all__ = [
     # Base classes and interfaces

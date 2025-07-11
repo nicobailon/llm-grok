@@ -8,12 +8,12 @@ through the LLM CLI interface.
 import base64
 import json
 import time
-from typing import Any, Dict, Iterator, List, Optional, Type
+from collections.abc import Iterator
+from typing import Any, Dict, List, Optional
 
 import httpx
 import llm
 from pydantic import Field
-
 
 # ============================================================================
 # Model Registry
@@ -69,7 +69,7 @@ class GrokError(Exception):
 
 class RateLimitError(GrokError):
     """Exception raised when API rate limit is exceeded."""
-    
+
     def __init__(self, message: str = "Rate limit exceeded", retry_after: Optional[int] = None):
         super().__init__(message)
         self.retry_after = retry_after
@@ -77,7 +77,7 @@ class RateLimitError(GrokError):
 
 class APIError(GrokError):
     """General API error for all other failures."""
-    
+
     def __init__(self, message: str, status_code: Optional[int] = None):
         super().__init__(message)
         self.status_code = status_code
@@ -89,7 +89,7 @@ class APIError(GrokError):
 
 class GrokClient:
     """HTTP client for Grok API with retry logic."""
-    
+
     def __init__(self, api_key: str, base_url: str = "https://api.x.ai/v1/chat/completions"):
         self.api_key = api_key
         self.base_url = base_url
@@ -97,12 +97,12 @@ class GrokClient:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    
+
     def post(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Make a POST request to the API with simple retry logic."""
         max_retries = 3
         retry_delay = 1.0
-        
+
         for attempt in range(max_retries):
             try:
                 with httpx.Client() as client:
@@ -112,7 +112,7 @@ class GrokClient:
                         json=data,
                         timeout=60.0
                     )
-                    
+
                     if response.status_code == 200:
                         return response.json()
                     elif response.status_code == 429:
@@ -133,20 +133,20 @@ class GrokClient:
                         except Exception:
                             pass
                         raise APIError(error_msg, response.status_code)
-                        
+
             except httpx.RequestError as e:
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                     retry_delay *= 2
                     continue
                 raise GrokError(f"Network error: {str(e)}")
-        
+
         raise GrokError("Max retries exceeded")
-    
+
     def stream(self, data: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
         """Make a streaming request to the API."""
         data["stream"] = True
-        
+
         try:
             with httpx.Client() as client:
                 with client.stream(
@@ -164,14 +164,14 @@ class GrokClient:
                             error_msg = error_data.get("error", {}).get("message", f"API error: {response.status_code}")
                         except Exception:
                             error_msg = f"API error: {response.status_code}"
-                        
+
                         if response.status_code == 429:
                             raise RateLimitError()
                         elif response.status_code == 401:
                             raise APIError("Authentication failed", 401)
                         else:
                             raise APIError(error_msg, response.status_code)
-                    
+
                     # Process SSE stream
                     for line in response.iter_lines():
                         if line.startswith("data: "):
@@ -182,7 +182,7 @@ class GrokClient:
                                 yield json.loads(data_str)
                             except json.JSONDecodeError:
                                 continue
-                                
+
         except httpx.RequestError as e:
             raise GrokError(f"Network error: {str(e)}")
 
@@ -193,11 +193,11 @@ class GrokClient:
 
 class Grok(llm.KeyModel):
     """Grok model implementation for LLM CLI."""
-    
+
     can_stream = True
     needs_key = "grok"
     key_env_var = "XAI_API_KEY"
-    
+
     class Options(llm.Options):  # type: ignore[override]
         temperature: Optional[float] = Field(
             description="Sampling temperature (0-1). Lower = more focused, higher = more random.",
@@ -218,17 +218,17 @@ class Grok(llm.KeyModel):
             description="Tool choice: 'auto', 'none', or specific function name",
             default=None,
         )
-    
+
     def __init__(self, model_id: str):
         self.model_id = model_id
         # Check if model exists
         if model_id not in MODELS:
             raise ValueError(f"Unknown model: {model_id}")
-    
+
     def build_messages(self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]) -> List[Dict[str, Any]]:
         """Build messages array from prompt and conversation."""
         messages = []
-        
+
         # Add conversation history
         if conversation:
             for response in conversation.responses:
@@ -237,18 +237,18 @@ class Grok(llm.KeyModel):
                 # Add assistant response
                 # response.text is a property on llm.Response
                 messages.append({"role": "assistant", "content": response.text})  # type: ignore[attr-defined]
-        
+
         # Add system prompt if provided
         if prompt.system:
             messages.insert(0, {"role": "system", "content": prompt.system})
-        
+
         # Add current prompt with attachments if any
         if hasattr(prompt, 'attachments') and prompt.attachments:
             # Handle multimodal content
             content = []
             if prompt.prompt:
                 content.append({"type": "text", "text": prompt.prompt})
-            
+
             model_info = MODELS.get(self.model_id, {})
             if model_info.get("supports_vision", False):
                 for attachment in prompt.attachments:
@@ -260,14 +260,14 @@ class Grok(llm.KeyModel):
                                 "type": "image_url",
                                 "image_url": {"url": image_url}
                             })
-            
+
             messages.append({"role": "user", "content": content})
         else:
             # Text-only prompt
             messages.append({"role": "user", "content": prompt.prompt})
-        
+
         return messages
-    
+
     def _process_image(self, attachment: llm.Attachment) -> Optional[str]:
         """Process image attachment and return URL or base64 data."""
         try:
@@ -275,20 +275,20 @@ class Grok(llm.KeyModel):
             if attachment.content:
                 data = attachment.content
             elif attachment.path:
-                data = attachment.path  
+                data = attachment.path
             elif attachment.url:
                 data = attachment.url
             else:
                 return None
-            
+
             # If it's already a URL, return as-is
             if isinstance(data, str) and (data.startswith("http://") or data.startswith("https://")):
                 return data
-            
+
             # If it's base64 data, ensure it has proper data URL format
             if isinstance(data, str) and data.startswith("data:image/"):
                 return data
-            
+
             # If it's raw image bytes, convert to base64
             if isinstance(data, bytes):
                 base64_data = base64.b64encode(data).decode('utf-8')
@@ -303,9 +303,9 @@ class Grok(llm.KeyModel):
                     mime_type = "image/webp"
                 else:
                     mime_type = "image/png"  # Default
-                
+
                 return f"data:{mime_type};base64,{base64_data}"
-            
+
             # Try to read as file path
             try:
                 with open(data, 'rb') as f:
@@ -314,11 +314,11 @@ class Grok(llm.KeyModel):
                     return f"data:image/png;base64,{base64_data}"
             except Exception:
                 pass
-            
+
             return None
         except Exception:
             return None
-    
+
     def execute(
         self,
         prompt: llm.Prompt,
@@ -330,35 +330,35 @@ class Grok(llm.KeyModel):
         """Execute a prompt against the model."""
         try:
             messages = self.build_messages(prompt, conversation)
-            
+
             # Get options from prompt
             options = prompt.options.__dict__ if prompt.options else {}
-            
+
             # Build request body
             body = {
                 "model": self.model_id,
                 "messages": messages,
                 "temperature": options.get("temperature", 0.7),
             }
-            
+
             if options.get("max_completion_tokens"):
                 body["max_completion_tokens"] = options["max_completion_tokens"]
-            
+
             # Add tools if supported by model
             model_info = MODELS.get(self.model_id, {})
             if model_info.get("supports_tools", False) and options.get("tools"):
                 body["tools"] = options["tools"]
                 if options.get("tool_choice"):
                     body["tool_choice"] = options["tool_choice"]
-            
+
             # Get API key
             api_key = key or self.key
             if not api_key:
                 raise APIError("No API key found. Set XAI_API_KEY environment variable.", 401)
-            
+
             # Create client
             client = GrokClient(api_key)
-            
+
             if stream:
                 # Streaming response - yield text chunks
                 for chunk_text in self._stream(client, body):
@@ -366,20 +366,20 @@ class Grok(llm.KeyModel):
             else:
                 # Non-streaming request
                 api_response = client.post(body)
-                
+
                 # Store response JSON for later access
                 response.response_json = api_response
-                
+
                 # Extract content and tool calls
                 content = ""
                 tool_calls = None
-                
+
                 if "choices" in api_response and api_response["choices"]:
                     choice = api_response["choices"][0]
                     message = choice.get("message", {})
                     content = message.get("content", "")
                     tool_calls = message.get("tool_calls")
-                
+
                 # Add tool calls to response if present
                 if tool_calls:
                     for tool_call in tool_calls:
@@ -394,11 +394,11 @@ class Grok(llm.KeyModel):
                             name=tool_call.get("function", {}).get("name"),
                             arguments=arguments_dict
                         ))
-                
+
                 # Yield the content
                 if content:
                     yield content
-                
+
         except RateLimitError as e:
             raise llm.ModelError(f"Rate limit exceeded{f': retry after {e.retry_after}s' if e.retry_after else ''}")
         except APIError as e:
@@ -407,7 +407,7 @@ class Grok(llm.KeyModel):
             raise llm.ModelError(str(e))
         except Exception as e:
             raise llm.ModelError(f"Error: {str(e)}")
-    
+
     def _stream(self, client: GrokClient, body: Dict[str, Any]) -> Iterator[str]:
         """Handle streaming responses."""
         try:
@@ -430,7 +430,7 @@ def register_models(register) -> None:
     # Register all models
     for model_id in MODELS:
         register(Grok(model_id))
-    
+
     # Register default model alias
     if DEFAULT_MODEL.startswith("x-ai/"):
         short_name = DEFAULT_MODEL[5:]  # Remove "x-ai/" prefix
@@ -445,12 +445,12 @@ def register_models(register) -> None:
 def register_commands(cli) -> None:
     """Register CLI commands."""
     import click
-    
+
     @cli.group()
     def grok() -> None:
         """Commands for working with Grok models"""
         pass
-    
+
     @grok.command()  # type: ignore[misc]
     def models() -> None:
         """List available Grok models"""

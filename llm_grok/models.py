@@ -4,7 +4,8 @@ This module contains model definitions, capabilities, and utility functions for 
 with different Grok model variants.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
 from .types import ModelInfo
 
 __all__ = [

@@ -1,39 +1,47 @@
 """HTTP client for Grok API with retry logic and rate limit handling."""
 
-import json
-import time
-import random
-import logging
-import threading
-from typing import Any, Dict, Iterator, Optional, Union, cast, ContextManager, Literal
-from contextlib import contextmanager
-from functools import lru_cache
 import hashlib
+import json
+import logging
+import random
+import threading
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, ContextManager, Dict, Literal, Optional, Union, cast
 
 import httpx
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from .constants import (
-    DEFAULT_TIMEOUT,
-    DEFAULT_MAX_CONNECTIONS,
     DEFAULT_KEEPALIVE_RATIO,
-    JITTER_FACTOR_MIN,
+    DEFAULT_MAX_CONNECTIONS,
+    DEFAULT_TIMEOUT,
     JITTER_FACTOR_MAX,
+    JITTER_FACTOR_MIN,
     SLEEP_INTERVAL_MAX,
 )
 from .exceptions import (
-    GrokError,
-    RateLimitError,
-    QuotaExceededError,
     APIError,
     AuthenticationError,
+    GrokError,
     NetworkError,
+    QuotaExceededError,
+    RateLimitError,
 )
 from .types import (
-    Message, AnthropicRequest, StreamOptions, ToolDefinition, AnthropicToolDefinition,
-    AnthropicToolChoice, OpenAIResponse, AnthropicResponse,
-    ResponseFormat, ToolChoice, RequestBody
+    AnthropicRequest,
+    AnthropicResponse,
+    AnthropicToolChoice,
+    AnthropicToolDefinition,
+    Message,
+    OpenAIResponse,
+    RequestBody,
+    ResponseFormat,
+    StreamOptions,
+    ToolChoice,
+    ToolDefinition,
 )
 
 console = Console()
@@ -50,23 +58,23 @@ class GrokClient:
     - Connection pooling and timeouts
     - Request/response logging hooks
     """
-    
+
     # Constants
     MAX_RETRIES = 3
     BASE_DELAY = 1.0  # seconds
     API_URL = "https://api.x.ai/v1/chat/completions"
     MESSAGES_URL = "https://api.x.ai/v1/messages"
-    
+
     # Resource limits for security
     MAX_WAIT_TIME = 60  # seconds - maximum time to wait for rate limiting
     MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB - maximum request body size
     MAX_BUFFER_SIZE = 100 * 1024 * 1024  # 100MB - maximum streaming buffer size
-    
+
     # Circuit breaker settings
     CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5  # Number of consecutive failures before opening circuit
     CIRCUIT_BREAKER_RECOVERY_TIMEOUT = 60  # seconds to wait before attempting recovery
     CIRCUIT_BREAKER_HALF_OPEN_REQUESTS = 1  # Number of test requests in half-open state
-    
+
     def __init__(
         self,
         api_key: str,
@@ -86,7 +94,7 @@ class GrokClient:
         self.timeout = timeout or DEFAULT_TIMEOUT
         self.max_connections = max_connections or DEFAULT_MAX_CONNECTIONS
         self.enable_logging = enable_logging
-        
+
         # Create persistent client pool with connection pooling
         self._client_pool = httpx.Client(
             limits=httpx.Limits(
@@ -96,40 +104,40 @@ class GrokClient:
             timeout=httpx.Timeout(self.timeout),
         )
         self._is_closed = False
-        
+
         # Circuit breaker state with thread safety
         self._circuit_breaker_lock = threading.Lock()
         self._consecutive_failures = 0
         self._circuit_opened_at: Optional[float] = None
         self._half_open_requests = 0
-        
+
         # JSON size estimation cache
         self._json_size_cache: Dict[str, int] = {}
         self._cache_lock = threading.Lock()
         self.MAX_CACHE_SIZE = 100  # Limit cache size to prevent memory issues
-    
+
     def __enter__(self) -> "GrokClient":
         """Enter context manager for proper resource management."""
         self._client_pool.__enter__()
         return self
-    
+
     def __exit__(self, *args: Any) -> None:
         """Exit context manager and cleanup resources."""
         if not self._is_closed:
             self._client_pool.__exit__(*args)
             self._is_closed = True
-    
+
     def close(self) -> None:
         """Manually close the client pool."""
         if not self._is_closed:
             self._client_pool.close()
             self._is_closed = True
-    
+
     def _log_request(self, method: str, url: str, headers: Dict[str, str], body: RequestBody) -> None:
         """Log outgoing request details."""
         if not self.enable_logging:
             return
-            
+
         console.print(f"[blue]→ {method} {url}[/blue]")
         # Don't log auth headers
         safe_headers = {k: v for k, v in headers.items() if k.lower() != "authorization"}
@@ -138,17 +146,17 @@ class GrokClient:
         if "messages" in body and isinstance(body["messages"], list):
             console.print(f"[dim]Messages: {len(body['messages'])} messages[/dim]")
         console.print(f"[dim]Model: {body.get('model', 'unknown')}[/dim]")
-    
+
     def _log_response(self, status_code: int, response_data: Optional[Union[OpenAIResponse, AnthropicResponse, Dict[str, str]]] = None) -> None:
         """Log incoming response details."""
         if not self.enable_logging:
             return
-            
+
         console.print(f"[green]← {status_code}[/green]")
         if response_data:
             if isinstance(response_data, dict) and "choices" in response_data:
                 console.print(f"[dim]Choices: {len(response_data['choices'])}[/dim]")
-    
+
     def _compute_cache_key(self, json_data: RequestBody) -> str:
         """Compute a cache key for JSON data.
         
@@ -162,7 +170,7 @@ class GrokClient:
         # We use sorted keys to ensure consistent hashing
         stable_str = json.dumps(json_data, sort_keys=True)
         return hashlib.md5(stable_str.encode('utf-8')).hexdigest()
-    
+
     def _estimate_json_size(self, json_data: RequestBody) -> int:
         """Estimate JSON size with caching.
         
@@ -173,25 +181,25 @@ class GrokClient:
             Estimated size in bytes
         """
         cache_key = self._compute_cache_key(json_data)
-        
+
         # Check cache first
         with self._cache_lock:
             if cache_key in self._json_size_cache:
                 return self._json_size_cache[cache_key]
-        
+
         # Compute actual size
         request_size = len(json.dumps(json_data).encode('utf-8'))
-        
+
         # Update cache with size limit
         with self._cache_lock:
             # If cache is too large, clear it
             if len(self._json_size_cache) >= self.MAX_CACHE_SIZE:
                 self._json_size_cache.clear()
-            
+
             self._json_size_cache[cache_key] = request_size
-        
+
         return request_size
-    
+
     def _validate_request_size(self, json_data: RequestBody) -> None:
         """Validate that request data doesn't exceed size limits.
         
@@ -203,13 +211,13 @@ class GrokClient:
         """
         # Use cached estimation
         request_size = self._estimate_json_size(json_data)
-        
+
         if request_size > self.MAX_REQUEST_SIZE:
             raise ValueError(
                 f"Request size ({request_size} bytes) exceeds maximum allowed size "
                 f"({self.MAX_REQUEST_SIZE} bytes). Please reduce the size of your request."
             )
-    
+
     def _calculate_backoff_delay(self, attempt: int, retry_after: Optional[int] = None) -> float:
         """Calculate backoff delay with exponential backoff and jitter.
         
@@ -229,18 +237,18 @@ class GrokClient:
             base_delay = self.BASE_DELAY * (2 ** attempt)
             # Add jitter up to 25% of base delay
             jitter = random.uniform(0, JITTER_FACTOR_MAX * base_delay)
-        
+
         delay = base_delay + jitter
-        
+
         # Cap total delay
         if delay > self.MAX_WAIT_TIME:
             logger.warning(
                 f"Calculated delay {delay:.2f}s exceeds maximum {self.MAX_WAIT_TIME}s, capping"
             )
             delay = self.MAX_WAIT_TIME
-        
+
         return delay
-    
+
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state and raise error if circuit is open.
         
@@ -250,7 +258,7 @@ class GrokClient:
         with self._circuit_breaker_lock:
             if self._circuit_opened_at is not None:
                 elapsed = time.time() - self._circuit_opened_at
-                
+
                 if elapsed < self.CIRCUIT_BREAKER_RECOVERY_TIMEOUT:
                     # Circuit is still open
                     remaining = self.CIRCUIT_BREAKER_RECOVERY_TIMEOUT - elapsed
@@ -262,7 +270,7 @@ class GrokClient:
                     # Move to half-open state
                     logger.info("Circuit breaker moving to half-open state")
                     self._half_open_requests = 0
-    
+
     def _record_success(self) -> None:
         """Record a successful request for circuit breaker."""
         with self._circuit_breaker_lock:
@@ -275,12 +283,12 @@ class GrokClient:
             else:
                 # Reset failure count on success
                 self._consecutive_failures = 0
-    
+
     def _record_failure(self) -> None:
         """Record a failed request for circuit breaker."""
         with self._circuit_breaker_lock:
             self._consecutive_failures += 1
-            
+
             if self._circuit_opened_at is not None:
                 # Failure in half-open state - reopen circuit
                 logger.warning("Circuit breaker reopening after failure in half-open state")
@@ -292,7 +300,7 @@ class GrokClient:
                     f"Circuit breaker opening after {self._consecutive_failures} consecutive failures"
                 )
                 self._circuit_opened_at = time.time()
-    
+
     @contextmanager
     def _wrap_stream_with_circuit_breaker(
         self, stream_cm: ContextManager[httpx.Response]
@@ -320,7 +328,7 @@ class GrokClient:
                 except Exception:
                     # Stream consumption failed
                     raise
-        except Exception as e:
+        except Exception:
             # Either entering the stream or consuming it failed
             self._record_failure()
             raise
@@ -328,7 +336,7 @@ class GrokClient:
             # Only record success if stream was consumed without exceptions
             if stream_succeeded:
                 self._record_success()
-    
+
     def _parse_error_response(self, response: httpx.Response) -> tuple[str, Optional[str]]:
         """Parse error details from API response.
         
@@ -345,27 +353,27 @@ class GrokClient:
                 error_body = response.read().decode("utf-8")
         except (AttributeError, UnicodeDecodeError, OSError):
             return str(response.status_code), None
-        
+
         try:
             error_json = json.loads(error_body)
-            
+
             # Check for standard error format
             if "error" in error_json:
                 error_data = error_json["error"]
                 message = error_data.get("message", "Unknown error")
                 code = error_data.get("code")
                 return message, code
-            
+
             # Check for simple message format
             if "message" in error_json:
                 return error_json["message"], error_json.get("code")
-                
+
             # Return full body if no standard format
             return error_body, None
-            
+
         except (json.JSONDecodeError, KeyError, TypeError):
             return error_body or str(response.status_code), None
-    
+
     def _handle_rate_limit(self, response: httpx.Response, attempt: int) -> bool:
         """Handle rate limit response with retry logic.
         
@@ -381,7 +389,7 @@ class GrokClient:
             QuotaExceededError: If quota is exhausted
         """
         retry_after = response.headers.get("Retry-After")
-        
+
         # Check if this is a quota exceeded error
         error_message, error_code = self._parse_error_response(response)
         if "quota" in error_message.lower() or error_code == "quota_exceeded":
@@ -389,13 +397,13 @@ class GrokClient:
                 "API quota exceeded. Please check your usage at https://console.x.ai",
                 details={"error": error_message}
             )
-        
+
         if attempt >= self.MAX_RETRIES - 1:
             raise RateLimitError(
                 f"Rate limit exceeded after {self.MAX_RETRIES} attempts",
                 retry_after=int(retry_after) if retry_after else None
             )
-        
+
         # Calculate wait time with jitter
         retry_after_int = None
         if retry_after:
@@ -403,13 +411,13 @@ class GrokClient:
                 retry_after_int = int(retry_after)
             except ValueError:
                 logger.warning(f"Invalid Retry-After header value: {retry_after}")
-        
+
         wait_time = self._calculate_backoff_delay(attempt, retry_after_int)
-        
+
         logger.info(
             f"Rate limited, retrying in {wait_time:.2f}s (attempt {attempt + 1}/{self.MAX_RETRIES})"
         )
-        
+
         # Show progress while waiting
         with Progress(
             SpinnerColumn(),
@@ -429,9 +437,9 @@ class GrokClient:
                 if actual_sleep > 0:
                     time.sleep(actual_sleep)
                     progress.update(task, advance=actual_sleep)
-        
+
         return True
-    
+
     def _handle_error_response(self, response: httpx.Response) -> None:
         """Handle non-rate-limit error responses.
         
@@ -443,21 +451,21 @@ class GrokClient:
             APIError: For other API errors
         """
         error_message, error_code = self._parse_error_response(response)
-        
+
         if response.status_code == 401:
             raise AuthenticationError(
                 "Invalid API key. Please check your xAI API key.",
                 details={"error": error_message}
             )
-        
+
         # Generic API error
         raise APIError(
             f"API request failed: {error_message}",
             status_code=response.status_code,
             details={"error_code": error_code} if error_code else None
         )
-    
-    
+
+
     def make_request(
         self,
         method: str,
@@ -488,17 +496,17 @@ class GrokClient:
         """
         # Check circuit breaker state
         self._check_circuit_breaker()
-        
+
         # Validate request size
         self._validate_request_size(json_data)
-        
+
         self._log_request(method, url, headers, json_data)
-        
+
         for attempt in range(self.MAX_RETRIES):
             try:
                 if self._is_closed:
                     raise GrokError("Client has been closed")
-                    
+
                 if stream:
                     # For streaming, wrap the context manager to track success/failure
                     stream_cm = self._client_pool.stream(
@@ -513,7 +521,7 @@ class GrokClient:
                     self._log_response(response.status_code)
                     self._record_success()
                     return response
-                        
+
             except httpx.HTTPStatusError as e:
                 # Handle HTTP errors with status codes
                 if e.response.status_code == 429:
@@ -522,7 +530,7 @@ class GrokClient:
                 else:
                     self._record_failure()
                     self._handle_error_response(e.response)
-                    
+
             except httpx.TimeoutException as e:
                 self._record_failure()
                 logger.error(f"Request timeout after {self.timeout}s")
@@ -530,7 +538,7 @@ class GrokClient:
                     "Request timed out",
                     original_error=e
                 )
-                
+
             except httpx.NetworkError as e:
                 self._record_failure()
                 logger.error(f"Network error: {str(e)}")
@@ -538,7 +546,7 @@ class GrokClient:
                     f"Network error: {str(e)}",
                     original_error=e
                 )
-                
+
             except Exception as e:
                 self._record_failure()
                 logger.error(f"Unexpected error: {type(e).__name__}: {str(e)}")
@@ -546,10 +554,10 @@ class GrokClient:
                     f"Unexpected error: {str(e)}",
                     details={"exception_type": type(e).__name__}
                 )
-        
+
         # Should not reach here due to exceptions in loop
         raise GrokError("Request failed after all retries")
-    
+
     def stream_request(
         self,
         method: str,
@@ -577,7 +585,7 @@ class GrokClient:
         # Type narrowing for mypy
         assert not isinstance(result, httpx.Response)
         return result
-    
+
     def post_openai_completion(
         self,
         messages: list[Message],
@@ -614,32 +622,32 @@ class GrokClient:
             "stream": stream,
             "temperature": temperature,
         }
-        
+
         if max_completion_tokens is not None:
             body["max_completion_tokens"] = max_completion_tokens
-        
+
         if tools is not None:
             body["tools"] = tools
-            
+
         if tool_choice is not None:
             body["tool_choice"] = tool_choice
-            
+
         if response_format is not None:
             body["response_format"] = response_format
-            
+
         if reasoning_effort is not None:
             body["reasoning_effort"] = reasoning_effort
-            
+
         if stream and stream_options is not None:
             body["stream_options"] = stream_options
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
-        
+
         return self.make_request("POST", self.API_URL, headers, cast(RequestBody, body), stream=stream)
-    
+
     def post_anthropic_messages(
         self,
         request_data: AnthropicRequest,
@@ -672,24 +680,24 @@ class GrokClient:
             "temperature": temperature,
             **request_data  # Includes messages and optional system
         }
-        
+
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
-        
+
         if tools is not None:
             body["tools"] = tools
-            
+
         if tool_choice is not None:
             body["tool_choice"] = tool_choice
-            
+
         if reasoning_effort is not None:
             body["reasoning_effort"] = reasoning_effort
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
-        
+
         return self.make_request("POST", self.MESSAGES_URL, headers, cast(RequestBody, body), stream=stream)
 
 

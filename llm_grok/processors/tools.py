@@ -3,8 +3,9 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Union
 
-from llm_grok.processors import ContentProcessor, ValidationError, ProcessorConfig
-from ..types import ToolCall, OpenAIResponse, AnthropicResponse
+from llm_grok.processors import ContentProcessor, ProcessorConfig, ValidationError
+
+from ..types import AnthropicResponse, OpenAIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +23,17 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
     - Parallel tool call support
     - Robust JSON argument validation and error recovery
     """
-    
+
     def __init__(self, model_id: str, config: Optional[ProcessorConfig] = None):
         """Initialize tool processor."""
         self.model_id = model_id
         self._config = config or ProcessorConfig()
-    
+
     @property
     def config(self) -> ProcessorConfig:
         """Get processor configuration."""
         return self._config
-    
+
     def process(self, content: Union[OpenAIResponse, AnthropicResponse, Dict[str, Any]]) -> List[ToolCall]:
         """Process tool calls from API response.
         
@@ -50,18 +51,18 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
         """
         response = content
         tool_calls: List[ToolCall] = []
-        
+
         # Handle OpenAI format
         if isinstance(response, dict) and "choices" in response and response["choices"]:
             choice = response["choices"][0]
             message = choice.get("message", {})
-            
+
             if "tool_calls" in message and message["tool_calls"]:
                 for raw_call in message["tool_calls"]:
                     validated_call = self._validate_and_format_tool_call(raw_call)
                     if validated_call:
                         tool_calls.append(validated_call)
-        
+
         # Handle Anthropic format
         elif isinstance(response, dict) and "content" in response and isinstance(response["content"], list):
             for content_block in response["content"]:
@@ -78,9 +79,9 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                     validated_call = self._validate_and_format_tool_call(openai_call)
                     if validated_call:
                         tool_calls.append(validated_call)
-        
+
         return tool_calls
-    
+
     def validate(self, tool_calls: List[ToolCall]) -> bool:
         """Validate a list of tool calls.
         
@@ -95,11 +96,11 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
         """
         if not isinstance(tool_calls, list):
             raise ValidationError("Tool calls must be a list")
-        
+
         for i, call in enumerate(tool_calls):
             if not isinstance(call, dict):
                 raise ValidationError(f"Tool call {i} must be a dict")
-            
+
             # Validate required fields
             if "id" not in call:
                 raise ValidationError(f"Tool call {i} missing 'id' field")
@@ -107,7 +108,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                 raise ValidationError(f"Tool call {i} missing 'type' field")
             if "function" not in call:
                 raise ValidationError(f"Tool call {i} missing 'function' field")
-            
+
             # Validate function structure
             func = call["function"]
             if not isinstance(func, dict):
@@ -116,7 +117,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                 raise ValidationError(f"Tool call {i} function missing 'name' field")
             if "arguments" not in func:
                 raise ValidationError(f"Tool call {i} function missing 'arguments' field")
-            
+
             # Validate arguments are valid JSON string
             if isinstance(func["arguments"], str):
                 try:
@@ -127,9 +128,9 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                     )
             else:
                 raise ValidationError(f"Tool call {i} arguments must be a JSON string")
-        
+
         return True
-    
+
     def _validate_and_format_tool_call(self, raw_call: Dict[str, Any]) -> Optional[ToolCall]:
         """Validate and format a single tool call.
         
@@ -144,16 +145,16 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             call_id = raw_call.get("id")
             call_type = raw_call.get("type", "function")
             function_data = raw_call.get("function", {})
-            
+
             if not call_id or not function_data:
                 return None
-            
+
             name = function_data.get("name")
             arguments_str = function_data.get("arguments", "{}")
-            
+
             if not name:
                 return None
-            
+
             # Validate arguments JSON
             try:
                 if arguments_str:
@@ -161,7 +162,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to parse tool arguments: {e}, using empty dict")
                 arguments_str = "{}"
-            
+
             # Create formatted tool call
             tool_call: ToolCall = {
                 "id": call_id,
@@ -171,17 +172,17 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                     "arguments": arguments_str
                 }
             }
-            
+
             # Add optional index
             if "index" in raw_call:
                 tool_call["index"] = raw_call["index"]
-            
+
             return tool_call
-            
+
         except Exception as e:
             logger.warning(f"Failed to convert tool call: {e}, skipping")
             return None
-    
+
     def process_tool_calls(self, response: Any, tool_calls: List[Dict[str, Any]]) -> None:
         """Process and add tool calls to the response object.
         
@@ -191,7 +192,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
         """
         # Import here to avoid circular dependency
         import llm
-        
+
         if hasattr(response, 'add_tool_call'):
             # Real llm.Response - convert to proper llm.ToolCall objects
             for tool_call in tool_calls:
@@ -201,7 +202,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse tool use input: {e}, using empty dict")
                         arguments = {}
-                    
+
                     response.add_tool_call(
                         llm.ToolCall(
                             tool_call_id=tool_call.get("id"),
@@ -212,7 +213,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
         else:
             # MockResponse - store raw format
             response.tool_calls = tool_calls
-    
+
     def accumulate_tool_call(self, accumulator: List[Dict[str, Any]], delta: Dict[str, Any]) -> None:
         """Accumulate streaming tool call chunks.
         
@@ -221,7 +222,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             delta: The incremental tool call data from the stream
         """
         index = delta.get("index", 0)
-        
+
         # Ensure accumulator has enough entries
         while len(accumulator) <= index:
             accumulator.append({
@@ -230,16 +231,16 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                 "type": "function",
                 "function": {"name": "", "arguments": ""}
             })
-        
+
         tool_call = accumulator[index]
-        
+
         # Merge tool call data
         if "id" in delta:
             tool_call["id"] = delta["id"]
-        
+
         if "type" in delta:
             tool_call["type"] = delta["type"]
-        
+
         if "function" in delta:
             func = delta["function"]
             if "name" in func:
@@ -247,7 +248,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             if "arguments" in func:
                 # Accumulate arguments (they come in chunks)
                 tool_call["function"]["arguments"] += func["arguments"]
-    
+
     def finalize_tool_calls(self, accumulated: List[Dict[str, Any]]) -> List[ToolCall]:
         """Convert accumulated tool calls to final format.
         
@@ -258,12 +259,12 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             List of properly formatted ToolCall objects
         """
         finalized: List[ToolCall] = []
-        
+
         for tool_call in accumulated:
             # Skip incomplete tool calls
             if not tool_call.get("id") or not tool_call.get("function", {}).get("name"):
                 continue
-            
+
             # Parse arguments JSON
             try:
                 arguments_str = tool_call["function"].get("arguments", "{}")
@@ -271,7 +272,7 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to parse accumulated arguments: {e}, using empty dict")
                 arguments = {}
-            
+
             # Create final ToolCall
             finalized_call: ToolCall = {
                 "id": tool_call["id"],
@@ -281,15 +282,15 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
                     "arguments": json.dumps(arguments) if isinstance(arguments, dict) else arguments_str
                 }
             }
-            
+
             # Add index if present
             if "index" in tool_call:
                 finalized_call["index"] = tool_call["index"]
-            
+
             finalized.append(finalized_call)
-        
+
         return finalized
-    
+
     def validate_tool_definition(self, tool: Dict[str, Any]) -> bool:
         """Validate tool conforms to expected schema.
         
@@ -302,38 +303,38 @@ class ToolProcessor(ContentProcessor[Union[OpenAIResponse, AnthropicResponse, Di
         # Check required top-level fields
         if not isinstance(tool, dict):
             return False
-        
+
         if tool.get("type") != "function":
             return False
-        
+
         # Check function definition
         function = tool.get("function")
         if not isinstance(function, dict):
             return False
-        
+
         # Check required function fields
         required_fields = ["name", "description", "parameters"]
         if not all(field in function for field in required_fields):
             return False
-        
+
         # Validate name
         if not isinstance(function["name"], str) or not function["name"]:
             return False
-        
+
         # Validate description
         if not isinstance(function["description"], str):
             return False
-        
+
         # Validate parameters schema
         parameters = function["parameters"]
         if not isinstance(parameters, dict):
             return False
-        
+
         # Basic JSON schema validation
         if parameters.get("type") != "object":
             return False
-        
+
         if "properties" not in parameters:
             return False
-        
+
         return True

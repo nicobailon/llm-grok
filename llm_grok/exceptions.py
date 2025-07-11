@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 __all__ = [
     "GrokError",
-    "RateLimitError", 
+    "RateLimitError",
     "QuotaExceededError",
     "ValidationError",
     "ConversionError",
@@ -28,8 +28,8 @@ class GrokError(Exception):
     """
 
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         details: Optional[Dict[str, Any]] = None,
         error_code: Optional[str] = None
     ) -> None:
@@ -53,7 +53,7 @@ class RateLimitError(GrokError):
     """
 
     def __init__(
-        self, 
+        self,
         message: str = "Rate limit exceeded",
         details: Optional[Dict[str, Any]] = None,
         retry_after: Optional[int] = None

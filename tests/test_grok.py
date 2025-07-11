@@ -550,7 +550,7 @@ def test_convert_to_anthropic_basic() -> None:
         cast(Message, {"role": "user", "content": "How are you?"})
     ]
     
-    anthropic_format = grok._convert_to_anthropic_messages(openai_messages)
+    anthropic_format = grok._openai_formatter.convert_messages_to_anthropic(openai_messages)
     
     assert "messages" in anthropic_format
     anthropic_messages = anthropic_format["messages"]
@@ -576,7 +576,7 @@ def test_convert_to_anthropic_with_system() -> None:
     ]
     
     # Test the actual conversion method
-    anthropic_format = grok._convert_to_anthropic_messages(openai_messages)
+    anthropic_format = grok._openai_formatter.convert_messages_to_anthropic(openai_messages)
     
     assert "system" in anthropic_format
     assert anthropic_format["system"] == "You are helpful"
