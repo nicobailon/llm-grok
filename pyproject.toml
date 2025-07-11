@@ -43,7 +43,7 @@ CI = "https://github.com/nicobailon/llm-grok/actions"
 grok-enhanced = "llm_grok"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-httpx"]
+test = ["pytest", "pytest-httpx", "pytest-cov"]
 dev = ["mypy", "black", "ruff", "types-click"]
 
 [tool.setuptools.packages.find]
@@ -78,6 +78,8 @@ target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings

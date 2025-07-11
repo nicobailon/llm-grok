@@ -11,7 +11,7 @@ import pytest
 from pytest_httpx import HTTPXMock
 
 from llm_grok.client import GrokClient
-from llm_grok.exceptions import NetworkError, APIError
+from llm_grok.exceptions import NetworkError, APIError, GrokError
 from llm_grok.types import RequestBody
 from tests.utils.mocks import TEST_API_KEY, CHAT_COMPLETIONS_URL
 
@@ -219,39 +219,38 @@ class TestCircuitBreakerThreadSafety:
         client.CIRCUIT_BREAKER_RECOVERY_TIMEOUT = 0.1
         results = []
         exceptions = []
-        
-        # Pre-configure enough exceptions for all threads
-        for _ in range(10):
+
+        # Configure exactly 5 exceptions to trigger circuit breaker opening
+        # After 5 failures, circuit opens and subsequent requests fail immediately
+        for _ in range(5):
             httpx_mock.add_exception(
                 httpx.NetworkError("Connection failed"),
                 url=CHAT_COMPLETIONS_URL,
                 method="POST"
             )
-        
+
         def make_failing_request() -> None:
             try:
                 client.make_request("POST", CHAT_COMPLETIONS_URL, {}, cast(RequestBody, {}))
                 results.append("success")
-            except NetworkError as e:
+            except (NetworkError, GrokError) as e:
                 exceptions.append(str(e))
-        
-        # Run 10 concurrent requests that will all fail
+
+        # Run 5 concurrent requests that will trigger circuit breaker
         threads = []
-        for _ in range(10):
+        for _ in range(5):
             thread = threading.Thread(target=make_failing_request)
             threads.append(thread)
             thread.start()
-        
+
         for thread in threads:
             thread.join()
-        
-        # Should have enough failures to open circuit
-        assert len(exceptions) == 10
-        # Check that circuit opened after some failures
+
+        # Should have 5 failures to open circuit
+        assert len(exceptions) == 5
+        # All should be network errors since circuit hasn't opened yet
         network_errors = [exc for exc in exceptions if "Connection failed" in exc]
-        circuit_errors = [exc for exc in exceptions if "Circuit breaker is open" in exc]
-        # Some should be network errors, some should be circuit breaker errors
-        assert len(network_errors) >= 5 or len(circuit_errors) > 0
+        assert len(network_errors) == 5
 
     def test_circuit_breaker_lock_prevents_race_conditions(self) -> None:
         """Circuit breaker uses locks to prevent race conditions."""

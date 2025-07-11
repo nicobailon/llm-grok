@@ -21,7 +21,16 @@ jobs:
         cache-dependency-path: pyproject.toml
     - name: Install dependencies
       run: |
-        pip install -e '.[test]'
+        pip install -e '.[test,dev]'
     - name: Run tests
       run: |
         pytest
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=llm_grok --cov-report=xml --cov-report=term-missing
+    - name: Type checking
+      run: |
+        mypy llm_grok --strict
+    - name: Linting
+      run: |
+        ruff check llm_grok/

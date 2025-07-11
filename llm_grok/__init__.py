@@ -8,9 +8,6 @@ Original work by Benedikt Hiepler, enhanced and maintained by Nico Bailon.
 
 from rich.console import Console
 
-# Module-level console instance for output formatting
-console = Console()
-
 from .client import GrokClient
 from .constants import (
     DEFAULT_RETRY_DELAY,
@@ -57,6 +54,9 @@ from .types import (
     ToolCall,
     ToolDefinition,
 )
+
+# Module-level console instance for output formatting
+console = Console()
 
 __version__ = "1.0.0"
 
